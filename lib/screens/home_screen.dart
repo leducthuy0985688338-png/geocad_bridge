@@ -12,6 +12,7 @@ import '../models/map_project.dart';
 import '../services/cad_file_service.dart';
 import '../services/dxf_parser_service.dart';
 import '../services/project_history_service.dart';
+import '../services/project_persistence_service.dart';
 import '../services/layer_reprojection_service.dart';
 import '../services/layer_georeference_service.dart';
 import '../services/kml_parser_service.dart';
@@ -36,6 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
       const LayerGeoreferenceService();
   final KmlParserService _kmlParserService = const KmlParserService();
   final KmlExportService _kmlExportService = const KmlExportService();
+  final ProjectPersistenceService _projectPersistenceService =
+      const ProjectPersistenceService();
 
   final ProjectHistoryService _history = ProjectHistoryService(maxHistory: 100);
 
@@ -46,6 +49,143 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isImporting = false;
   bool _isExporting = false;
+  bool _isProjectBusy = false;
+  String? _projectPath;
+  DateTime _projectCreatedAt = DateTime.now().toUtc();
+
+  void _newProject() {
+    if (_isProjectBusy) return;
+    final now = DateTime.now().toUtc();
+    _history.clear();
+    setState(() {
+      _project = MapProject(
+        id: 'project-${now.microsecondsSinceEpoch}',
+        name: 'Dự án GeoCAD mới',
+      );
+      _projectPath = null;
+      _projectCreatedAt = now;
+    });
+    _showMessage('Đã tạo project mới.');
+  }
+
+  Future<void> _openProject() async {
+    if (_isProjectBusy) return;
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['geocad'],
+      dialogTitle: 'Mở GeoCAD Project',
+    );
+    if (files.isEmpty || !mounted) return;
+    final path = files.single.path;
+    if (path == null || path.isEmpty) {
+      _showMessage('Không lấy được đường dẫn project.');
+      return;
+    }
+
+    setState(() => _isProjectBusy = true);
+    try {
+      final loaded = await _projectPersistenceService.load(path);
+      if (!mounted) return;
+      _history.clear();
+      setState(() {
+        _project = loaded.project;
+        _projectPath = path;
+        _projectCreatedAt = loaded.createdAt;
+      });
+      if (loaded.warnings.isEmpty) {
+        _showMessage('Đã mở project "${loaded.project.name}".');
+      } else {
+        await _showProjectWarnings(loaded.warnings);
+      }
+    } catch (error) {
+      _showMessage('Không thể mở project: $error');
+    } finally {
+      if (mounted) setState(() => _isProjectBusy = false);
+    }
+  }
+
+  Future<void> _saveProject() async {
+    if (_isProjectBusy) return;
+    final path = _projectPath;
+    if (path == null) {
+      await _saveProjectAs();
+      return;
+    }
+    await _saveProjectTo(path, updateCurrentPath: false);
+  }
+
+  Future<void> _saveProjectAs() async {
+    if (_isProjectBusy) return;
+    final uri = await FilePicker.saveFile(
+      dialogTitle: 'Lưu GeoCAD Project',
+      fileName: '${_safeFileName(_project.name)}.geocad',
+      type: FileType.custom,
+      allowedExtensions: const ['geocad'],
+      bytes: Uint8List(0),
+    );
+    if (uri == null || !mounted) return;
+    await _saveProjectTo(uri.toFilePath(), updateCurrentPath: true);
+  }
+
+  Future<void> _saveProjectTo(
+    String path, {
+    required bool updateCurrentPath,
+  }) async {
+    setState(() => _isProjectBusy = true);
+    try {
+      final document = GeoCadProjectDocument(
+        project: _project,
+        createdAt: _projectCreatedAt,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      await _projectPersistenceService.save(path, document);
+      if (!mounted) return;
+      if (updateCurrentPath) {
+        setState(() => _projectPath = path);
+      }
+      _showMessage('Đã lưu project: $path');
+    } catch (error) {
+      _showMessage('Không thể lưu project: $error');
+    } finally {
+      if (mounted) setState(() => _isProjectBusy = false);
+    }
+  }
+
+  Future<void> _showProjectWarnings(List<String> warnings) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Project đã mở với cảnh báo'),
+        content: SizedBox(
+          width: 600,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Geometry đã được khôi phục. Một số file nguồn không còn tồn tại:',
+                ),
+                const SizedBox(height: 12),
+                for (final warning in warnings)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text('• $warning'),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _openCadFiles() async {
     if (_isImporting) return;
@@ -815,6 +955,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
+                IconButton(
+                  tooltip: 'Project mới',
+                  onPressed: _isProjectBusy ? null : _newProject,
+                  icon: const Icon(Icons.note_add_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Mở project',
+                  onPressed: _isProjectBusy ? null : _openProject,
+                  icon: const Icon(Icons.folder_open),
+                ),
+                IconButton(
+                  tooltip: 'Lưu project',
+                  onPressed: _isProjectBusy ? null : _saveProject,
+                  icon: const Icon(Icons.save_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Lưu project thành...',
+                  onPressed: _isProjectBusy ? null : _saveProjectAs,
+                  icon: const Icon(Icons.save_as_outlined),
+                ),
+                const VerticalDivider(
+                  width: 20,
+                  indent: 12,
+                  endIndent: 12,
+                  color: Colors.white38,
+                ),
                 IconButton(
                   tooltip: 'Undo (Ctrl+Z)',
                   onPressed: _history.canUndo ? _undo : null,

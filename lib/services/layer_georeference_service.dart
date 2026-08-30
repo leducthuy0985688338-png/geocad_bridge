@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import '../models/coordinate_reference_system.dart';
@@ -366,6 +367,21 @@ class LayerGeoreferenceService {
             .suspectedPointIndices
             .join(','),
         'georeferenceHasTiedMaximum': fit.assessment.hasTiedMaximum.toString(),
+        'georeferenceControlPoints': jsonEncode([
+          for (final point in controlPoints)
+            {
+              'local': {
+                'x': point.local.x,
+                'y': point.local.y,
+                if (point.local.z != null) 'z': point.local.z,
+              },
+              'target': {
+                'x': point.target.x,
+                'y': point.target.y,
+                if (point.target.z != null) 'z': point.target.z,
+              },
+            },
+        ]),
         'targetCrs': targetCrs.displayName,
       });
 

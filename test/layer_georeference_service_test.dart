@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:autocad_googleearth/models/coordinate_reference_system.dart';
@@ -723,6 +725,15 @@ void main() {
     expect(result.layer.properties, contains('georeferenceRmse'));
     expect(result.layer.properties, contains('georeferenceMaxResidual'));
     expect(result.layer.properties, contains('georeferenceMaxResidualIndex'));
+    final storedPoints = jsonDecode(
+      result.layer.properties['georeferenceControlPoints']!,
+    ) as List<dynamic>;
+    expect(storedPoints, hasLength(3));
+    expect((storedPoints.first as Map)['local'], {'x': 0.0, 'y': 0.0});
+    expect((storedPoints.first as Map)['target'], {
+      'x': 500000.0,
+      'y': 1800000.0,
+    });
     expect(
       () => result.residuals.add(
         const GeoreferenceResidual(
