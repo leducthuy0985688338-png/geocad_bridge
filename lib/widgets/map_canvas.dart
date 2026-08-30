@@ -16,22 +16,16 @@ class MapCanvas extends StatefulWidget {
   final MapProject project;
   final ValueChanged<MapFeatureChange>? onFeatureChanged;
 
-  const MapCanvas({
-    super.key,
-    required this.project,
-    this.onFeatureChanged,
-  });
+  const MapCanvas({super.key, required this.project, this.onFeatureChanged});
 
   @override
   State<MapCanvas> createState() => _MapCanvasState();
 }
 
 class _MapCanvasState extends State<MapCanvas> {
-  final MapSelectionService _selectionService =
-      const MapSelectionService();
+  final MapSelectionService _selectionService = const MapSelectionService();
 
-  final MapSnapService _snapService =
-      const MapSnapService();
+  final MapSnapService _snapService = const MapSnapService();
 
   double _zoom = 1.0;
   Offset _pan = Offset.zero;
@@ -84,17 +78,14 @@ class _MapCanvasState extends State<MapCanvas> {
   MapFeature? get _displaySelectedFeature {
     final preview = _previewFeature;
 
-    if (preview != null &&
-        _selectedFeature != null) {
+    if (preview != null && _selectedFeature != null) {
       return preview;
     }
 
     return _selectedFeature;
   }
 
-  bool _isFeatureLocked(
-    MapFeature feature,
-  ) {
+  bool _isFeatureLocked(MapFeature feature) {
     for (final layer in widget.project.layers) {
       final containsFeature = layer.features.any(
         (item) => identical(item, feature),
@@ -109,16 +100,12 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   @override
-  void didUpdateWidget(
-    covariant MapCanvas oldWidget,
-  ) {
+  void didUpdateWidget(covariant MapCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     final selected = _selectedFeature;
 
-    if (selected != null &&
-        !_isEditingVertex &&
-        !_isMovingFeature) {
+    if (selected != null && !_isEditingVertex && !_isMovingFeature) {
       MapFeature? updatedFeature;
 
       for (final feature in _projectFeatures) {
@@ -161,9 +148,7 @@ class _MapCanvasState extends State<MapCanvas> {
       return;
     }
 
-    _changeZoom(
-      _zoom * 1.25,
-    );
+    _changeZoom(_zoom * 1.25);
   }
 
   void _zoomOut() {
@@ -171,73 +156,43 @@ class _MapCanvasState extends State<MapCanvas> {
       return;
     }
 
-    _changeZoom(
-      _zoom / 1.25,
-    );
+    _changeZoom(_zoom / 1.25);
   }
 
-  void _changeZoom(
-    double newZoom,
-  ) {
+  void _changeZoom(double newZoom) {
     setState(() {
-      _zoom = newZoom.clamp(
-        _minZoom,
-        _maxZoom,
-      );
+      _zoom = newZoom.clamp(_minZoom, _maxZoom);
 
       _snapResult = null;
     });
   }
 
-  void _handlePointerSignal(
-    PointerSignalEvent event,
-    Size canvasSize,
-  ) {
-    if (_isEditingVertex ||
-        _isMovingFeature ||
-        event is! PointerScrollEvent) {
+  void _handlePointerSignal(PointerSignalEvent event, Size canvasSize) {
+    if (_isEditingVertex || _isMovingFeature || event is! PointerScrollEvent) {
       return;
     }
 
     final oldZoom = _zoom;
 
-    final zoomFactor =
-        event.scrollDelta.dy < 0
-            ? 1.15
-            : 1 / 1.15;
+    final zoomFactor = event.scrollDelta.dy < 0 ? 1.15 : 1 / 1.15;
 
-    final newZoom =
-        (_zoom * zoomFactor).clamp(
-      _minZoom,
-      _maxZoom,
-    );
+    final newZoom = (_zoom * zoomFactor).clamp(_minZoom, _maxZoom);
 
     if (newZoom == oldZoom) {
       return;
     }
 
-    final pointer =
-        event.localPosition;
+    final pointer = event.localPosition;
 
-    final center = Offset(
-      canvasSize.width / 2,
-      canvasSize.height / 2,
-    );
+    final center = Offset(canvasSize.width / 2, canvasSize.height / 2);
 
-    final oldOffsetFromCenter =
-        pointer - center - _pan;
+    final oldOffsetFromCenter = pointer - center - _pan;
 
-    final scaleRatio =
-        newZoom / oldZoom;
+    final scaleRatio = newZoom / oldZoom;
 
-    final newOffsetFromCenter =
-        oldOffsetFromCenter *
-            scaleRatio;
+    final newOffsetFromCenter = oldOffsetFromCenter * scaleRatio;
 
-    final newPan =
-        pointer -
-        center -
-        newOffsetFromCenter;
+    final newPan = pointer - center - newOffsetFromCenter;
 
     setState(() {
       _zoom = newZoom;
@@ -245,37 +200,22 @@ class _MapCanvasState extends State<MapCanvas> {
       _snapResult = null;
     });
 
-    _updatePointerState(
-      pointer,
-      canvasSize,
-    );
+    _updatePointerState(pointer, canvasSize);
   }
 
-  void _handlePointerDown(
-    PointerDownEvent event,
-    Size canvasSize,
-  ) {
-    if (event.buttons ==
-        kPrimaryMouseButton) {
-      if (_tryStartVertexEdit(
-        event.localPosition,
-        canvasSize,
-      )) {
+  void _handlePointerDown(PointerDownEvent event, Size canvasSize) {
+    if (event.buttons == kPrimaryMouseButton) {
+      if (_tryStartVertexEdit(event.localPosition, canvasSize)) {
         return;
       }
 
-      if (_tryStartFeatureMove(
-        event.localPosition,
-        canvasSize,
-      )) {
+      if (_tryStartFeatureMove(event.localPosition, canvasSize)) {
         return;
       }
     }
 
-    if (event.buttons !=
-            kPrimaryMouseButton &&
-        event.buttons !=
-            kMiddleMouseButton) {
+    if (event.buttons != kPrimaryMouseButton &&
+        event.buttons != kMiddleMouseButton) {
       return;
     }
 
@@ -283,31 +223,20 @@ class _MapCanvasState extends State<MapCanvas> {
       _isPanning = true;
       _pointerMoved = false;
 
-      _lastPanPosition =
-          event.localPosition;
+      _lastPanPosition = event.localPosition;
 
-      _pointerDownPosition =
-          event.localPosition;
+      _pointerDownPosition = event.localPosition;
 
       _snapResult = null;
     });
   }
 
-  bool _tryStartVertexEdit(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
-    final selected =
-        _selectedFeature;
+  bool _tryStartVertexEdit(Offset localPosition, Size canvasSize) {
+    final selected = _selectedFeature;
 
-    final snap =
-        _findSnapAtPosition(
-      localPosition,
-      canvasSize,
-    );
+    final snap = _findSnapAtPosition(localPosition, canvasSize);
 
-    if (selected == null ||
-        snap == null) {
+    if (selected == null || snap == null) {
       return false;
     }
 
@@ -322,16 +251,13 @@ class _MapCanvasState extends State<MapCanvas> {
     setState(() {
       _isEditingVertex = true;
 
-      _editingCoordinateIndex =
-          snap.coordinateIndex;
+      _editingCoordinateIndex = snap.coordinateIndex;
 
-      _previewFeature =
-          selected;
+      _previewFeature = selected;
 
       _pointerMoved = false;
 
-      _pointerDownPosition =
-          localPosition;
+      _pointerDownPosition = localPosition;
 
       _lastPanPosition = null;
 
@@ -343,20 +269,14 @@ class _MapCanvasState extends State<MapCanvas> {
     return true;
   }
 
-  bool _tryStartFeatureMove(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
+  bool _tryStartFeatureMove(Offset localPosition, Size canvasSize) {
     final selected = _selectedFeature;
 
-    if (selected == null ||
-        _isFeatureLocked(selected)) {
+    if (selected == null || _isFeatureLocked(selected)) {
       return false;
     }
 
-    final bounds = _calculateBounds(
-      _projectFeatures,
-    );
+    final bounds = _calculateBounds(_projectFeatures);
 
     if (bounds == null) {
       return false;
@@ -379,8 +299,7 @@ class _MapCanvasState extends State<MapCanvas> {
       return false;
     }
 
-    final toleranceCad =
-        _selectionTolerancePixels / effectiveScale;
+    final toleranceCad = _selectionTolerancePixels / effectiveScale;
 
     final result = _selectionService.findNearestFeature(
       features: [selected],
@@ -406,71 +325,46 @@ class _MapCanvasState extends State<MapCanvas> {
     return true;
   }
 
-  void _handlePointerMove(
-    PointerMoveEvent event,
-    Size canvasSize,
-  ) {
+  void _handlePointerMove(PointerMoveEvent event, Size canvasSize) {
     if (_isMovingFeature) {
-      _updateFeatureMove(
-        event.localPosition,
-        canvasSize,
-      );
+      _updateFeatureMove(event.localPosition, canvasSize);
       return;
     }
 
     if (_isEditingVertex) {
-      _updateVertexEdit(
-        event.localPosition,
-        canvasSize,
-      );
+      _updateVertexEdit(event.localPosition, canvasSize);
 
       return;
     }
 
-    if (_isPanning &&
-        _lastPanPosition != null) {
-      final currentPosition =
-          event.localPosition;
+    if (_isPanning && _lastPanPosition != null) {
+      final currentPosition = event.localPosition;
 
-      final downPosition =
-          _pointerDownPosition;
+      final downPosition = _pointerDownPosition;
 
       if (downPosition != null) {
-        final totalMovement =
-            (currentPosition -
-                    downPosition)
-                .distance;
+        final totalMovement = (currentPosition - downPosition).distance;
 
-        if (totalMovement >
-            _clickMovementTolerance) {
+        if (totalMovement > _clickMovementTolerance) {
           _pointerMoved = true;
         }
       }
 
-      final delta =
-          currentPosition -
-          _lastPanPosition!;
+      final delta = currentPosition - _lastPanPosition!;
 
       setState(() {
         _pan += delta;
 
-        _lastPanPosition =
-            currentPosition;
+        _lastPanPosition = currentPosition;
 
         _snapResult = null;
       });
     }
 
-    _updatePointerState(
-      event.localPosition,
-      canvasSize,
-    );
+    _updatePointerState(event.localPosition, canvasSize);
   }
 
-  void _updateFeatureMove(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
+  void _updateFeatureMove(Offset localPosition, Size canvasSize) {
     final selected = _selectedFeature;
     final start = _moveStartCoordinate;
 
@@ -478,9 +372,7 @@ class _MapCanvasState extends State<MapCanvas> {
       return;
     }
 
-    final bounds = _calculateBounds(
-      _projectFeatures,
-    );
+    final bounds = _calculateBounds(_projectFeatures);
 
     if (bounds == null) {
       return;
@@ -491,17 +383,12 @@ class _MapCanvasState extends State<MapCanvas> {
       canvasSize: canvasSize,
     );
 
-    final current = transform.fromCanvas(
-      localPosition,
-      zoom: _zoom,
-      pan: _pan,
-    );
+    final current = transform.fromCanvas(localPosition, zoom: _zoom, pan: _pan);
 
     final downPosition = _pointerDownPosition;
 
     if (downPosition != null &&
-        (localPosition - downPosition).distance >
-            _clickMovementTolerance) {
+        (localPosition - downPosition).distance > _clickMovementTolerance) {
       _pointerMoved = true;
     }
 
@@ -517,55 +404,40 @@ class _MapCanvasState extends State<MapCanvas> {
     });
   }
 
-  void _updateVertexEdit(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
-    final selected =
-        _selectedFeature;
+  void _updateVertexEdit(Offset localPosition, Size canvasSize) {
+    final selected = _selectedFeature;
 
-    final coordinateIndex =
-        _editingCoordinateIndex;
+    final coordinateIndex = _editingCoordinateIndex;
 
-    if (selected == null ||
-        coordinateIndex == null) {
+    if (selected == null || coordinateIndex == null) {
       return;
     }
 
-    final bounds = _calculateBounds(
-      _projectFeatures,
-    );
+    final bounds = _calculateBounds(_projectFeatures);
 
     if (bounds == null) {
       return;
     }
 
-    final transform =
-        _MapTransform.create(
+    final transform = _MapTransform.create(
       bounds: bounds,
       canvasSize: canvasSize,
     );
 
-    final coordinate =
-        transform.fromCanvas(
+    final coordinate = transform.fromCanvas(
       localPosition,
       zoom: _zoom,
       pan: _pan,
     );
 
-    final downPosition =
-        _pointerDownPosition;
+    final downPosition = _pointerDownPosition;
 
     if (downPosition != null &&
-        (localPosition -
-                    downPosition)
-                .distance >
-            _clickMovementTolerance) {
+        (localPosition - downPosition).distance > _clickMovementTolerance) {
       _pointerMoved = true;
     }
 
-    final updated =
-        selected.updateCoordinate(
+    final updated = selected.updateCoordinate(
       index: coordinateIndex,
       coordinate: coordinate,
     );
@@ -577,21 +449,14 @@ class _MapCanvasState extends State<MapCanvas> {
       _snapResult = MapSnapResult(
         feature: updated,
         coordinate: coordinate,
-        type: _snapTypeForCoordinate(
-          updated,
-          coordinateIndex,
-        ),
+        type: _snapTypeForCoordinate(updated, coordinateIndex),
         distance: 0,
-        coordinateIndex:
-            coordinateIndex,
+        coordinateIndex: coordinateIndex,
       );
     });
   }
 
-  MapSnapType _snapTypeForCoordinate(
-    MapFeature feature,
-    int index,
-  ) {
+  MapSnapType _snapTypeForCoordinate(MapFeature feature, int index) {
     switch (feature.type) {
       case MapFeatureType.point:
       case MapFeatureType.line:
@@ -599,10 +464,7 @@ class _MapCanvasState extends State<MapCanvas> {
         return MapSnapType.endpoint;
 
       case MapFeatureType.polyline:
-        if (index == 0 ||
-            index ==
-                feature.coordinates.length -
-                    1) {
+        if (index == 0 || index == feature.coordinates.length - 1) {
           return MapSnapType.endpoint;
         }
 
@@ -613,23 +475,14 @@ class _MapCanvasState extends State<MapCanvas> {
     }
   }
 
-  void _handlePointerUp(
-    PointerUpEvent event,
-    Size canvasSize,
-  ) {
+  void _handlePointerUp(PointerUpEvent event, Size canvasSize) {
     if (_isMovingFeature) {
-      _finishFeatureMove(
-        event.localPosition,
-        canvasSize,
-      );
+      _finishFeatureMove(event.localPosition, canvasSize);
       return;
     }
 
     if (_isEditingVertex) {
-      _finishVertexEdit(
-        event.localPosition,
-        canvasSize,
-      );
+      _finishVertexEdit(event.localPosition, canvasSize);
 
       return;
     }
@@ -639,8 +492,7 @@ class _MapCanvasState extends State<MapCanvas> {
     }
 
     final shouldSelect =
-        event.kind ==
-            PointerDeviceKind.mouse &&
+        event.kind == PointerDeviceKind.mouse &&
         event.buttons == 0 &&
         !_pointerMoved;
 
@@ -651,26 +503,16 @@ class _MapCanvasState extends State<MapCanvas> {
     });
 
     if (shouldSelect) {
-      _selectAtPosition(
-        event.localPosition,
-        canvasSize,
-      );
+      _selectAtPosition(event.localPosition, canvasSize);
     }
 
-    _updatePointerState(
-      event.localPosition,
-      canvasSize,
-    );
+    _updatePointerState(event.localPosition, canvasSize);
   }
 
-  void _finishFeatureMove(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
+  void _finishFeatureMove(Offset localPosition, Size canvasSize) {
     final original = _selectedFeature;
     final preview = _previewFeature;
-    final changed =
-        _pointerMoved && original != null && preview != null;
+    final changed = _pointerMoved && original != null && preview != null;
 
     setState(() {
       if (changed) {
@@ -687,28 +529,18 @@ class _MapCanvasState extends State<MapCanvas> {
 
     if (changed) {
       widget.onFeatureChanged?.call(
-        MapFeatureChange(
-          originalFeature: original,
-          updatedFeature: preview,
-        ),
+        MapFeatureChange(originalFeature: original, updatedFeature: preview),
       );
     }
 
-    _updatePointerState(
-      localPosition,
-      canvasSize,
-    );
+    _updatePointerState(localPosition, canvasSize);
   }
 
-  void _finishVertexEdit(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
+  void _finishVertexEdit(Offset localPosition, Size canvasSize) {
     final original = _selectedFeature;
     final preview = _previewFeature;
 
-    final changed =
-        _pointerMoved && original != null && preview != null;
+    final changed = _pointerMoved && original != null && preview != null;
 
     setState(() {
       if (changed) {
@@ -725,22 +557,14 @@ class _MapCanvasState extends State<MapCanvas> {
 
     if (changed) {
       widget.onFeatureChanged?.call(
-        MapFeatureChange(
-          originalFeature: original,
-          updatedFeature: preview,
-        ),
+        MapFeatureChange(originalFeature: original, updatedFeature: preview),
       );
     }
 
-    _updatePointerState(
-      localPosition,
-      canvasSize,
-    );
+    _updatePointerState(localPosition, canvasSize);
   }
 
-  void _handlePointerCancel(
-    PointerCancelEvent event,
-  ) {
+  void _handlePointerCancel(PointerCancelEvent event) {
     setState(() {
       _isPanning = false;
       _isEditingVertex = false;
@@ -750,8 +574,7 @@ class _MapCanvasState extends State<MapCanvas> {
       _lastPanPosition = null;
       _pointerDownPosition = null;
 
-      _editingCoordinateIndex =
-          null;
+      _editingCoordinateIndex = null;
       _moveStartCoordinate = null;
 
       _previewFeature = null;
@@ -759,41 +582,31 @@ class _MapCanvasState extends State<MapCanvas> {
     });
   }
 
-  MapSnapResult? _findSnapAtPosition(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
-    final bounds = _calculateBounds(
-      _displayFeatures,
-    );
+  MapSnapResult? _findSnapAtPosition(Offset localPosition, Size canvasSize) {
+    final bounds = _calculateBounds(_displayFeatures);
 
     if (bounds == null) {
       return null;
     }
 
-    final transform =
-        _MapTransform.create(
+    final transform = _MapTransform.create(
       bounds: bounds,
       canvasSize: canvasSize,
     );
 
-    final coordinate =
-        transform.fromCanvas(
+    final coordinate = transform.fromCanvas(
       localPosition,
       zoom: _zoom,
       pan: _pan,
     );
 
-    final effectiveScale =
-        transform.scale * _zoom;
+    final effectiveScale = transform.scale * _zoom;
 
     if (effectiveScale <= 0) {
       return null;
     }
 
-    final toleranceCad =
-        _snapTolerancePixels /
-        effectiveScale;
+    final toleranceCad = _snapTolerancePixels / effectiveScale;
 
     return _snapService.findNearestSnap(
       features: _displayFeatures,
@@ -802,48 +615,36 @@ class _MapCanvasState extends State<MapCanvas> {
     );
   }
 
-  void _updatePointerState(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
+  void _updatePointerState(Offset localPosition, Size canvasSize) {
     if (_isEditingVertex || _isMovingFeature) {
       return;
     }
 
-    final bounds = _calculateBounds(
-      _displayFeatures,
-    );
+    final bounds = _calculateBounds(_displayFeatures);
 
     if (bounds == null) {
       return;
     }
 
-    final transform =
-        _MapTransform.create(
+    final transform = _MapTransform.create(
       bounds: bounds,
       canvasSize: canvasSize,
     );
 
-    final coordinate =
-        transform.fromCanvas(
+    final coordinate = transform.fromCanvas(
       localPosition,
       zoom: _zoom,
       pan: _pan,
     );
 
-    final effectiveScale =
-        transform.scale * _zoom;
+    final effectiveScale = transform.scale * _zoom;
 
     MapSnapResult? snap;
 
-    if (!_isPanning &&
-        effectiveScale > 0) {
-      final toleranceCad =
-          _snapTolerancePixels /
-          effectiveScale;
+    if (!_isPanning && effectiveScale > 0) {
+      final toleranceCad = _snapTolerancePixels / effectiveScale;
 
-      snap =
-          _snapService.findNearestSnap(
+      snap = _snapService.findNearestSnap(
         features: _displayFeatures,
         position: coordinate,
         tolerance: toleranceCad,
@@ -856,53 +657,40 @@ class _MapCanvasState extends State<MapCanvas> {
     });
   }
 
-  void _selectAtPosition(
-    Offset localPosition,
-    Size canvasSize,
-  ) {
-    final bounds = _calculateBounds(
-      _displayFeatures,
-    );
+  void _selectAtPosition(Offset localPosition, Size canvasSize) {
+    final bounds = _calculateBounds(_displayFeatures);
 
     if (bounds == null) {
       return;
     }
 
-    final transform =
-        _MapTransform.create(
+    final transform = _MapTransform.create(
       bounds: bounds,
       canvasSize: canvasSize,
     );
 
-    final cadPosition =
-        transform.fromCanvas(
+    final cadPosition = transform.fromCanvas(
       localPosition,
       zoom: _zoom,
       pan: _pan,
     );
 
-    final effectiveScale =
-        transform.scale * _zoom;
+    final effectiveScale = transform.scale * _zoom;
 
     if (effectiveScale <= 0) {
       return;
     }
 
-    final toleranceCad =
-        _selectionTolerancePixels /
-        effectiveScale;
+    final toleranceCad = _selectionTolerancePixels / effectiveScale;
 
-    final result =
-        _selectionService
-            .findNearestFeature(
+    final result = _selectionService.findNearestFeature(
       features: _displayFeatures,
       position: cadPosition,
       tolerance: toleranceCad,
     );
 
     setState(() {
-      _selectedFeature =
-          result?.feature;
+      _selectedFeature = result?.feature;
     });
   }
 
@@ -940,13 +728,10 @@ class _MapCanvasState extends State<MapCanvas> {
         !_isFeatureLocked(feature);
   }
 
-  void _commitFeatureUpdate(
-    MapFeature updatedFeature,
-  ) {
+  void _commitFeatureUpdate(MapFeature updatedFeature) {
     final original = _selectedFeature;
 
-    if (original == null ||
-        _isFeatureLocked(original)) {
+    if (original == null || _isFeatureLocked(original)) {
       return;
     }
 
@@ -971,8 +756,7 @@ class _MapCanvasState extends State<MapCanvas> {
       return;
     }
 
-    final isPolygon =
-        feature.type == MapFeatureType.polygon;
+    final isPolygon = feature.type == MapFeatureType.polygon;
 
     final segmentCount = isPolygon
         ? feature.coordinates.length
@@ -985,8 +769,8 @@ class _MapCanvasState extends State<MapCanvas> {
     var segmentIndex = 0;
 
     final start = feature.coordinates[0];
-    final end = feature.coordinates[
-        isPolygon && feature.coordinates.length == 1 ? 0 : 1];
+    final end = feature
+        .coordinates[isPolygon && feature.coordinates.length == 1 ? 0 : 1];
 
     final xController = TextEditingController(
       text: ((start.x + end.x) / 2).toStringAsFixed(4),
@@ -1003,20 +787,13 @@ class _MapCanvasState extends State<MapCanvas> {
             void updateMidpoint(int newSegmentIndex) {
               segmentIndex = newSegmentIndex;
 
-              final first =
-                  feature.coordinates[segmentIndex];
+              final first = feature.coordinates[segmentIndex];
               final secondIndex =
-                  (segmentIndex + 1) %
-                      feature.coordinates.length;
-              final second =
-                  feature.coordinates[secondIndex];
+                  (segmentIndex + 1) % feature.coordinates.length;
+              final second = feature.coordinates[secondIndex];
 
-              xController.text =
-                  ((first.x + second.x) / 2)
-                      .toStringAsFixed(4);
-              yController.text =
-                  ((first.y + second.y) / 2)
-                      .toStringAsFixed(4);
+              xController.text = ((first.x + second.x) / 2).toStringAsFixed(4);
+              yController.text = ((first.y + second.y) / 2).toStringAsFixed(4);
             }
 
             return AlertDialog(
@@ -1025,8 +802,7 @@ class _MapCanvasState extends State<MapCanvas> {
                 width: 380,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'Chọn đoạn cần chèn đỉnh. '
@@ -1039,21 +815,17 @@ class _MapCanvasState extends State<MapCanvas> {
                         labelText: 'Đoạn',
                         border: OutlineInputBorder(),
                       ),
-                      items: List.generate(
-                        segmentCount,
-                        (index) {
-                          final nextIndex =
-                              (index + 1) %
-                                  feature.coordinates.length;
-                          return DropdownMenuItem(
-                            value: index,
-                            child: Text(
-                              'Đỉnh ${index + 1} → '
-                              'Đỉnh ${nextIndex + 1}',
-                            ),
-                          );
-                        },
-                      ),
+                      items: List.generate(segmentCount, (index) {
+                        final nextIndex =
+                            (index + 1) % feature.coordinates.length;
+                        return DropdownMenuItem(
+                          value: index,
+                          child: Text(
+                            'Đỉnh ${index + 1} → '
+                            'Đỉnh ${nextIndex + 1}',
+                          ),
+                        );
+                      }),
                       onChanged: (value) {
                         if (value == null) return;
                         setDialogState(() {
@@ -1064,8 +836,7 @@ class _MapCanvasState extends State<MapCanvas> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: xController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(
+                      keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
                       ),
@@ -1077,8 +848,7 @@ class _MapCanvasState extends State<MapCanvas> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: yController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(
+                      keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
                       ),
@@ -1099,19 +869,15 @@ class _MapCanvasState extends State<MapCanvas> {
                 ),
                 FilledButton(
                   onPressed: () {
-                    final x =
-                        double.tryParse(xController.text.trim());
-                    final y =
-                        double.tryParse(yController.text.trim());
+                    final x = double.tryParse(xController.text.trim());
+                    final y = double.tryParse(yController.text.trim());
 
                     if (x == null || y == null) {
                       ScaffoldMessenger.of(context)
                         ..hideCurrentSnackBar()
                         ..showSnackBar(
                           const SnackBar(
-                            content: Text(
-                              'X và Y phải là số hợp lệ.',
-                            ),
+                            content: Text('X và Y phải là số hợp lệ.'),
                           ),
                         );
                       return;
@@ -1120,10 +886,7 @@ class _MapCanvasState extends State<MapCanvas> {
                     Navigator.of(dialogContext).pop(
                       _VertexInsertResult(
                         segmentIndex: segmentIndex,
-                        coordinate: MapCoordinate(
-                          x: x,
-                          y: y,
-                        ),
+                        coordinate: MapCoordinate(x: x, y: y),
                       ),
                     );
                   },
@@ -1143,8 +906,7 @@ class _MapCanvasState extends State<MapCanvas> {
       return;
     }
 
-    final originalZ =
-        feature.coordinates[result.segmentIndex].z;
+    final originalZ = feature.coordinates[result.segmentIndex].z;
 
     final coordinate = MapCoordinate(
       x: result.coordinate.x,
@@ -1174,8 +936,7 @@ class _MapCanvasState extends State<MapCanvas> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final coordinate =
-                feature.coordinates[coordinateIndex];
+            final coordinate = feature.coordinates[coordinateIndex];
 
             return AlertDialog(
               title: const Text('Xóa đỉnh'),
@@ -1183,8 +944,7 @@ class _MapCanvasState extends State<MapCanvas> {
                 width: 380,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       feature.type == MapFeatureType.polygon
@@ -1232,9 +992,7 @@ class _MapCanvasState extends State<MapCanvas> {
                 ),
                 FilledButton(
                   onPressed: () {
-                    Navigator.of(dialogContext).pop(
-                      coordinateIndex,
-                    );
+                    Navigator.of(dialogContext).pop(coordinateIndex);
                   },
                   child: const Text('Xóa đỉnh'),
                 ),
@@ -1277,13 +1035,10 @@ class _MapCanvasState extends State<MapCanvas> {
           builder: (context, setDialogState) {
             void loadCoordinate(int index) {
               coordinateIndex = index;
-              final coordinate =
-                  feature.coordinates[index];
+              final coordinate = feature.coordinates[index];
 
-              xController.text =
-                  coordinate.x.toStringAsFixed(4);
-              yController.text =
-                  coordinate.y.toStringAsFixed(4);
+              xController.text = coordinate.x.toStringAsFixed(4);
+              yController.text = coordinate.y.toStringAsFixed(4);
             }
 
             return AlertDialog(
@@ -1316,8 +1071,7 @@ class _MapCanvasState extends State<MapCanvas> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: xController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(
+                      keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
                       ),
@@ -1329,8 +1083,7 @@ class _MapCanvasState extends State<MapCanvas> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: yController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(
+                      keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
                       ),
@@ -1351,19 +1104,15 @@ class _MapCanvasState extends State<MapCanvas> {
                 ),
                 FilledButton(
                   onPressed: () {
-                    final x =
-                        double.tryParse(xController.text.trim());
-                    final y =
-                        double.tryParse(yController.text.trim());
+                    final x = double.tryParse(xController.text.trim());
+                    final y = double.tryParse(yController.text.trim());
 
                     if (x == null || y == null) {
                       ScaffoldMessenger.of(context)
                         ..hideCurrentSnackBar()
                         ..showSnackBar(
                           const SnackBar(
-                            content: Text(
-                              'X và Y phải là số hợp lệ.',
-                            ),
+                            content: Text('X và Y phải là số hợp lệ.'),
                           ),
                         );
                       return;
@@ -1393,16 +1142,11 @@ class _MapCanvasState extends State<MapCanvas> {
       return;
     }
 
-    final oldCoordinate =
-        feature.coordinates[result.coordinateIndex];
+    final oldCoordinate = feature.coordinates[result.coordinateIndex];
 
     final updated = feature.updateCoordinate(
       index: result.coordinateIndex,
-      coordinate: MapCoordinate(
-        x: result.x,
-        y: result.y,
-        z: oldCoordinate.z,
-      ),
+      coordinate: MapCoordinate(x: result.x, y: result.y, z: oldCoordinate.z),
     );
 
     _commitFeatureUpdate(updated);
@@ -1419,60 +1163,29 @@ class _MapCanvasState extends State<MapCanvas> {
     });
   }
 
-  _MapBounds? _calculateBounds(
-    List<MapFeature> features,
-  ) {
+  _MapBounds? _calculateBounds(List<MapFeature> features) {
     double? minX;
     double? minY;
     double? maxX;
     double? maxY;
 
     for (final feature in features) {
-      for (final coordinate
-          in feature.coordinates) {
-        minX = minX == null
-            ? coordinate.x
-            : math.min(
-                minX,
-                coordinate.x,
-              );
+      for (final coordinate in feature.coordinates) {
+        minX = minX == null ? coordinate.x : math.min(minX, coordinate.x);
 
-        minY = minY == null
-            ? coordinate.y
-            : math.min(
-                minY,
-                coordinate.y,
-              );
+        minY = minY == null ? coordinate.y : math.min(minY, coordinate.y);
 
-        maxX = maxX == null
-            ? coordinate.x
-            : math.max(
-                maxX,
-                coordinate.x,
-              );
+        maxX = maxX == null ? coordinate.x : math.max(maxX, coordinate.x);
 
-        maxY = maxY == null
-            ? coordinate.y
-            : math.max(
-                maxY,
-                coordinate.y,
-              );
+        maxY = maxY == null ? coordinate.y : math.max(maxY, coordinate.y);
       }
     }
 
-    if (minX == null ||
-        minY == null ||
-        maxX == null ||
-        maxY == null) {
+    if (minX == null || minY == null || maxX == null || maxY == null) {
       return null;
     }
 
-    return _MapBounds(
-      minX: minX,
-      minY: minY,
-      maxX: maxX,
-      maxY: maxY,
-    );
+    return _MapBounds(minX: minX, minY: minY, maxX: maxX, maxY: maxY);
   }
 
   @override
@@ -1482,26 +1195,16 @@ class _MapCanvasState extends State<MapCanvas> {
     }
 
     return LayoutBuilder(
-      builder: (
-        context,
-        constraints,
-      ) {
-        final canvasSize = Size(
-          constraints.maxWidth,
-          constraints.maxHeight,
-        );
+      builder: (context, constraints) {
+        final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
 
-        final bounds =
-            _calculateBounds(
-          _displayFeatures,
-        );
+        final bounds = _calculateBounds(_displayFeatures);
 
         if (bounds == null) {
           return const _EmptyMapCanvas();
         }
 
-        final transform =
-            _MapTransform.create(
+        final transform = _MapTransform.create(
           bounds: bounds,
           canvasSize: canvasSize,
         );
@@ -1513,79 +1216,45 @@ class _MapCanvasState extends State<MapCanvas> {
                 cursor: _isMovingFeature
                     ? SystemMouseCursors.move
                     : _isEditingVertex
-                        ? SystemMouseCursors.precise
+                    ? SystemMouseCursors.precise
                     : _isPanning
-                        ? SystemMouseCursors
-                            .grabbing
-                        : _snapResult != null
-                            ? SystemMouseCursors
-                                .precise
-                            : SystemMouseCursors
-                                .grab,
+                    ? SystemMouseCursors.grabbing
+                    : _snapResult != null
+                    ? SystemMouseCursors.precise
+                    : SystemMouseCursors.grab,
                 onHover: (event) {
-                  _updatePointerState(
-                    event.localPosition,
-                    canvasSize,
-                  );
+                  _updatePointerState(event.localPosition, canvasSize);
                 },
                 onExit: (_) {
                   _clearPointerState();
                 },
                 child: Listener(
-                  behavior:
-                      HitTestBehavior.opaque,
-                  onPointerSignal:
-                      (event) {
-                    _handlePointerSignal(
-                      event,
-                      canvasSize,
-                    );
+                  behavior: HitTestBehavior.opaque,
+                  onPointerSignal: (event) {
+                    _handlePointerSignal(event, canvasSize);
                   },
-                  onPointerDown:
-                      (event) {
-                    _handlePointerDown(
-                      event,
-                      canvasSize,
-                    );
+                  onPointerDown: (event) {
+                    _handlePointerDown(event, canvasSize);
                   },
-                  onPointerMove:
-                      (event) {
-                    _handlePointerMove(
-                      event,
-                      canvasSize,
-                    );
+                  onPointerMove: (event) {
+                    _handlePointerMove(event, canvasSize);
                   },
                   onPointerUp: (event) {
-                    _handlePointerUp(
-                      event,
-                      canvasSize,
-                    );
+                    _handlePointerUp(event, canvasSize);
                   },
-                  onPointerCancel:
-                      _handlePointerCancel,
+                  onPointerCancel: _handlePointerCancel,
                   child: Stack(
                     children: [
                       Positioned.fill(
                         child: CustomPaint(
-                          painter:
-                              CadGridPainter(
-                            minX:
-                                bounds.minX,
-                            minY:
-                                bounds.minY,
-                            maxX:
-                                bounds.maxX,
-                            maxY:
-                                bounds.maxY,
-                            baseScale:
-                                transform
-                                    .scale,
-                            offsetX:
-                                transform
-                                    .offsetX,
-                            offsetY:
-                                transform
-                                    .offsetY,
+                          painter: CadGridPainter(
+                            minX: bounds.minX,
+                            minY: bounds.minY,
+                            maxX: bounds.maxX,
+                            maxY: bounds.maxY,
+                            baseScale: transform.scale,
+                            offsetX: transform.offsetX,
+                            offsetY: transform.offsetY,
                             zoom: _zoom,
                             pan: _pan,
                           ),
@@ -1593,31 +1262,22 @@ class _MapCanvasState extends State<MapCanvas> {
                       ),
                       Positioned.fill(
                         child: CustomPaint(
-                          painter:
-                              _MapProjectPainter(
-                            features:
-                                _displayFeatures,
+                          painter: _MapProjectPainter(
+                            features: _displayFeatures,
                             zoom: _zoom,
                             pan: _pan,
                           ),
                         ),
                       ),
                       Positioned.fill(
-                        child:
-                            IgnorePointer(
-                          child:
-                              CustomPaint(
-                            painter:
-                                SelectionPainter(
-                              selectedFeature:
-                                  _displaySelectedFeature,
-                              toCanvas:
-                                  (coordinate) {
-                                return transform
-                                    .toScreen(
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: SelectionPainter(
+                              selectedFeature: _displaySelectedFeature,
+                              toCanvas: (coordinate) {
+                                return transform.toScreen(
                                   coordinate,
-                                  zoom:
-                                      _zoom,
+                                  zoom: _zoom,
                                   pan: _pan,
                                 );
                               },
@@ -1627,21 +1287,14 @@ class _MapCanvasState extends State<MapCanvas> {
                         ),
                       ),
                       Positioned.fill(
-                        child:
-                            IgnorePointer(
-                          child:
-                              CustomPaint(
-                            painter:
-                                SnapPainter(
-                              snapResult:
-                                  _snapResult,
-                              toScreen:
-                                  (coordinate) {
-                                return transform
-                                    .toScreen(
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: SnapPainter(
+                              snapResult: _snapResult,
+                              toScreen: (coordinate) {
+                                return transform.toScreen(
                                   coordinate,
-                                  zoom:
-                                      _zoom,
+                                  zoom: _zoom,
                                   pan: _pan,
                                 );
                               },
@@ -1659,28 +1312,21 @@ class _MapCanvasState extends State<MapCanvas> {
               right: 12,
               child: _MapToolbar(
                 zoom: _zoom,
-                editing:
-                    _isEditingVertex || _isMovingFeature,
+                editing: _isEditingVertex || _isMovingFeature,
                 onZoomIn: _zoomIn,
                 onZoomOut: _zoomOut,
                 onFit: _fitView,
               ),
             ),
-            if (_displaySelectedFeature !=
-                null)
+            if (_displaySelectedFeature != null)
               Positioned(
                 top: 70,
                 right: 12,
                 child: _SelectionInfo(
-                  feature:
-                      _displaySelectedFeature!,
-                  locked: _isFeatureLocked(
-                    _displaySelectedFeature!,
-                  ),
-                  editing:
-                      _isEditingVertex,
-                  moving:
-                      _isMovingFeature,
+                  feature: _displaySelectedFeature!,
+                  locked: _isFeatureLocked(_displaySelectedFeature!),
+                  editing: _isEditingVertex,
+                  moving: _isMovingFeature,
                 ),
               ),
             if (_displaySelectedFeature != null)
@@ -1688,35 +1334,30 @@ class _MapCanvasState extends State<MapCanvas> {
                 top: 258,
                 right: 12,
                 child: _GeometryEditActions(
-                  canAddVertex: _canAddVertex &&
+                  canAddVertex:
+                      _canAddVertex && !_isEditingVertex && !_isMovingFeature,
+                  canDeleteVertex:
+                      _canDeleteVertex &&
                       !_isEditingVertex &&
                       !_isMovingFeature,
-                  canDeleteVertex: _canDeleteVertex &&
-                      !_isEditingVertex &&
-                      !_isMovingFeature,
-                  canEditCoordinate: _canEditCoordinate &&
+                  canEditCoordinate:
+                      _canEditCoordinate &&
                       !_isEditingVertex &&
                       !_isMovingFeature,
                   onAddVertex: _showAddVertexDialog,
                   onDeleteVertex: _showDeleteVertexDialog,
-                  onEditCoordinate:
-                      _showCoordinateEditorDialog,
+                  onEditCoordinate: _showCoordinateEditorDialog,
                 ),
               ),
             Positioned(
               left: 12,
               bottom: 12,
-              child:
-                  _CoordinateIndicator(
-                coordinate:
-                    _mouseCoordinate,
-                snapResult:
-                    _snapResult,
+              child: _CoordinateIndicator(
+                coordinate: _mouseCoordinate,
+                snapResult: _snapResult,
                 zoom: _zoom,
-                editing:
-                    _isEditingVertex,
-                moving:
-                    _isMovingFeature,
+                editing: _isEditingVertex,
+                moving: _isMovingFeature,
               ),
             ),
           ],
@@ -1726,8 +1367,7 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 }
 
-class _MapToolbar
-    extends StatelessWidget {
+class _MapToolbar extends StatelessWidget {
   final double zoom;
   final bool editing;
 
@@ -1747,55 +1387,34 @@ class _MapToolbar
   Widget build(BuildContext context) {
     return Material(
       elevation: 3,
-      borderRadius:
-          BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(8),
       color: Colors.white,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
             tooltip: 'Phóng to',
-            onPressed:
-                editing ? null : onZoomIn,
-            icon:
-                const Icon(Icons.add),
+            onPressed: editing ? null : onZoomIn,
+            icon: const Icon(Icons.add),
           ),
           Container(
-            constraints:
-                const BoxConstraints(
-              minWidth: 64,
-            ),
+            constraints: const BoxConstraints(minWidth: 64),
             alignment: Alignment.center,
             child: Text(
               '${(zoom * 100).round()}%',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
           IconButton(
             tooltip: 'Thu nhỏ',
-            onPressed:
-                editing ? null : onZoomOut,
-            icon:
-                const Icon(Icons.remove),
+            onPressed: editing ? null : onZoomOut,
+            icon: const Icon(Icons.remove),
           ),
-          Container(
-            width: 1,
-            height: 28,
-            color:
-                const Color(0xFFE0E0E0),
-          ),
+          Container(width: 1, height: 28, color: const Color(0xFFE0E0E0)),
           IconButton(
-            tooltip:
-                'Fit toàn bộ bản vẽ',
-            onPressed:
-                editing ? null : onFit,
-            icon: const Icon(
-              Icons.fit_screen,
-            ),
+            tooltip: 'Fit toàn bộ bản vẽ',
+            onPressed: editing ? null : onFit,
+            icon: const Icon(Icons.fit_screen),
           ),
         ],
       ),
@@ -1803,8 +1422,7 @@ class _MapToolbar
   }
 }
 
-class _GeometryEditActions
-    extends StatelessWidget {
+class _GeometryEditActions extends StatelessWidget {
   final bool canAddVertex;
   final bool canDeleteVertex;
   final bool canEditCoordinate;
@@ -1836,32 +1454,22 @@ class _GeometryEditActions
             Tooltip(
               message: 'Thêm đỉnh vào Polyline/Polygon',
               child: IconButton(
-                onPressed:
-                    canAddVertex ? onAddVertex : null,
-                icon: const Icon(
-                  Icons.add_location_alt_outlined,
-                ),
+                onPressed: canAddVertex ? onAddVertex : null,
+                icon: const Icon(Icons.add_location_alt_outlined),
               ),
             ),
             Tooltip(
               message: 'Xóa một đỉnh',
               child: IconButton(
-                onPressed:
-                    canDeleteVertex ? onDeleteVertex : null,
-                icon: const Icon(
-                  Icons.remove_circle_outline,
-                ),
+                onPressed: canDeleteVertex ? onDeleteVertex : null,
+                icon: const Icon(Icons.remove_circle_outline),
               ),
             ),
             Tooltip(
               message: 'Nhập tọa độ X/Y chính xác',
               child: IconButton(
-                onPressed: canEditCoordinate
-                    ? onEditCoordinate
-                    : null,
-                icon: const Icon(
-                  Icons.pin_drop_outlined,
-                ),
+                onPressed: canEditCoordinate ? onEditCoordinate : null,
+                icon: const Icon(Icons.pin_drop_outlined),
               ),
             ),
           ],
@@ -1871,8 +1479,7 @@ class _GeometryEditActions
   }
 }
 
-class _SelectionInfo
-    extends StatelessWidget {
+class _SelectionInfo extends StatelessWidget {
   final MapFeature feature;
   final bool locked;
   final bool editing;
@@ -1887,67 +1494,47 @@ class _SelectionInfo
 
   @override
   Widget build(BuildContext context) {
-    final cadLayer =
-        feature.properties['cadLayer'];
+    final cadLayer = feature.properties['cadLayer'];
 
     return IgnorePointer(
       child: Material(
         elevation: 3,
-        borderRadius:
-            BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(8),
         color: Colors.white,
         child: Container(
           width: 240,
-          padding:
-              const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: editing
-                  ? const Color(
-                      0xFF00A86B,
-                    )
-                  : const Color(
-                      0xFFFFB74D,
-                    ),
+                  ? const Color(0xFF00A86B)
+                  : const Color(0xFFFFB74D),
             ),
           ),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            mainAxisSize:
-                MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
                   Icon(
-                    editing
-                        ? Icons.edit
-                        : Icons.ads_click,
+                    editing ? Icons.edit : Icons.ads_click,
                     size: 17,
                     color: editing
-                        ? const Color(
-                            0xFF00A86B,
-                          )
-                        : const Color(
-                            0xFFFF9800,
-                          ),
+                        ? const Color(0xFF00A86B)
+                        : const Color(0xFFFF9800),
                   ),
-                  const SizedBox(
-                    width: 7,
-                  ),
+                  const SizedBox(width: 7),
                   Text(
                     moving
                         ? 'ĐANG DI CHUYỂN'
                         : editing
-                            ? 'ĐANG SỬA ĐỈNH'
-                            : 'ĐỐI TƯỢNG ĐÃ CHỌN',
-                    style:
-                        const TextStyle(
+                        ? 'ĐANG SỬA ĐỈNH'
+                        : 'ĐỐI TƯỢNG ĐÃ CHỌN',
+                    style: const TextStyle(
                       fontSize: 11,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -1955,38 +1542,24 @@ class _SelectionInfo
               const SizedBox(height: 10),
               _InfoRow(
                 label: 'Tên',
-                value:
-                    feature.name.isEmpty
-                        ? feature.id
-                        : feature.name,
+                value: feature.name.isEmpty ? feature.id : feature.name,
               ),
-              _InfoRow(
-                label: 'Loại',
-                value:
-                    _featureTypeLabel(
-                  feature.type,
-                ),
-              ),
+              _InfoRow(label: 'Loại', value: _featureTypeLabel(feature.type)),
               _InfoRow(
                 label: 'Số đỉnh',
-                value:
-                    '${feature.coordinates.length}',
+                value: '${feature.coordinates.length}',
               ),
-              if (cadLayer != null &&
-                  cadLayer.isNotEmpty)
-                _InfoRow(
-                  label: 'CAD Layer',
-                  value: cadLayer,
-                ),
+              if (cadLayer != null && cadLayer.isNotEmpty)
+                _InfoRow(label: 'CAD Layer', value: cadLayer),
               _InfoRow(
                 label: 'Trạng thái',
                 value: locked
                     ? 'Layer đã khóa'
                     : moving
-                        ? 'Đang di chuyển đối tượng'
-                        : editing
-                            ? 'Đang kéo đỉnh'
-                            : 'Có thể chỉnh sửa',
+                    ? 'Đang di chuyển đối tượng'
+                    : editing
+                    ? 'Đang kéo đỉnh'
+                    : 'Có thể chỉnh sửa',
               ),
             ],
           ),
@@ -1995,9 +1568,7 @@ class _SelectionInfo
     );
   }
 
-  static String _featureTypeLabel(
-    MapFeatureType type,
-  ) {
+  static String _featureTypeLabel(MapFeatureType type) {
     switch (type) {
       case MapFeatureType.point:
         return 'POINT';
@@ -2017,45 +1588,28 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _InfoRow({
-    required this.label,
-    required this.value,
-  });
+  const _InfoRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          const EdgeInsets.only(
-        bottom: 5,
-      ),
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 72,
             child: Text(
               '$label:',
-              style:
-                  const TextStyle(
-                fontSize: 11,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
             ),
           ),
           Expanded(
             child: Text(
               value,
               maxLines: 2,
-              overflow:
-                  TextOverflow.ellipsis,
-              style:
-                  const TextStyle(
-                fontSize: 11,
-                fontWeight:
-                    FontWeight.w600,
-              ),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -2064,8 +1618,7 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _CoordinateIndicator
-    extends StatelessWidget {
+class _CoordinateIndicator extends StatelessWidget {
   final MapCoordinate? coordinate;
   final MapSnapResult? snapResult;
   final double zoom;
@@ -2082,56 +1635,40 @@ class _CoordinateIndicator
 
   @override
   Widget build(BuildContext context) {
-    final displayCoordinate =
-        snapResult?.coordinate ??
-            coordinate;
+    final displayCoordinate = snapResult?.coordinate ?? coordinate;
 
-    final coordinateText =
-        displayCoordinate == null
-            ? 'X: —    Y: —'
-            : 'X: ${_formatCoordinate(displayCoordinate.x)}    '
-                'Y: ${_formatCoordinate(displayCoordinate.y)}';
+    final coordinateText = displayCoordinate == null
+        ? 'X: —    Y: —'
+        : 'X: ${_formatCoordinate(displayCoordinate.x)}    '
+              'Y: ${_formatCoordinate(displayCoordinate.y)}';
 
     return IgnorePointer(
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 8,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color:
-              Colors.black.withValues(
-            alpha: 0.72,
-          ),
-          borderRadius:
-              BorderRadius.circular(6),
+          color: Colors.black.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               moving
                   ? Icons.open_with
                   : editing
-                      ? Icons.edit_location_alt
+                  ? Icons.edit_location_alt
                   : snapResult != null
-                      ? Icons.gps_fixed
-                      : Icons.my_location,
+                  ? Icons.gps_fixed
+                  : Icons.my_location,
               size: 14,
-              color: moving ||
-                      editing ||
-                      snapResult != null
-                  ? const Color(
-                      0xFF69F0AE,
-                    )
+              color: moving || editing || snapResult != null
+                  ? const Color(0xFF69F0AE)
                   : Colors.white,
             ),
             const SizedBox(width: 8),
             if (moving) ...[
               const Text(
-                'MOVE  ' ,
+                'MOVE  ',
                 style: TextStyle(
                   color: Color(0xFF69F0AE),
                   fontSize: 11,
@@ -2142,53 +1679,35 @@ class _CoordinateIndicator
               const Text(
                 'EDIT VERTEX  ',
                 style: TextStyle(
-                  color:
-                      Color(0xFF69F0AE),
+                  color: Color(0xFF69F0AE),
                   fontSize: 11,
-                  fontWeight:
-                      FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ] else if (snapResult !=
-                null) ...[
+            ] else if (snapResult != null) ...[
               Text(
                 '${snapResult!.label}  ',
-                style:
-                    const TextStyle(
-                  color:
-                      Color(0xFF69F0AE),
+                style: const TextStyle(
+                  color: Color(0xFF69F0AE),
                   fontSize: 11,
-                  fontWeight:
-                      FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
             Text(
               coordinateText,
-              style:
-                  const TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 11,
-                fontFeatures: [
-                  FontFeature
-                      .tabularFigures(),
-                ],
+                fontFeatures: [FontFeature.tabularFigures()],
               ),
             ),
             const SizedBox(width: 14),
-            Container(
-              width: 1,
-              height: 14,
-              color: Colors.white30,
-            ),
+            Container(width: 1, height: 14, color: Colors.white30),
             const SizedBox(width: 14),
             Text(
               'Zoom ${(zoom * 100).round()}%',
-              style:
-                  const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-              ),
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],
         ),
@@ -2196,11 +1715,8 @@ class _CoordinateIndicator
     );
   }
 
-  static String _formatCoordinate(
-    double value,
-  ) {
-    final absoluteValue =
-        value.abs();
+  static String _formatCoordinate(double value) {
+    final absoluteValue = value.abs();
 
     if (absoluteValue >= 1000000) {
       return value.toStringAsFixed(2);
@@ -2214,8 +1730,7 @@ class _CoordinateIndicator
   }
 }
 
-class _EmptyMapCanvas
-    extends StatelessWidget {
+class _EmptyMapCanvas extends StatelessWidget {
   const _EmptyMapCanvas();
 
   @override
@@ -2224,29 +1739,18 @@ class _EmptyMapCanvas
       color: Colors.white,
       child: const Center(
         child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.layers_clear,
-              size: 64,
-              color: Colors.grey,
-            ),
+            Icon(Icons.layers_clear, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text(
               'Chưa có hình học để hiển thị',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight:
-                    FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             SizedBox(height: 6),
             Text(
               'Hãy mở một file DXF có dữ liệu hình học.',
-              style: TextStyle(
-                color: Colors.grey,
-              ),
+              style: TextStyle(color: Colors.grey),
             ),
           ],
         ),
@@ -2255,8 +1759,7 @@ class _EmptyMapCanvas
   }
 }
 
-class _MapProjectPainter
-    extends CustomPainter {
+class _MapProjectPainter extends CustomPainter {
   final List<MapFeature> features;
   final double zoom;
   final Offset pan;
@@ -2268,82 +1771,51 @@ class _MapProjectPainter
   });
 
   @override
-  void paint(
-    Canvas canvas,
-    Size size,
-  ) {
-    if (features.isEmpty ||
-        size.width <= 0 ||
-        size.height <= 0) {
+  void paint(Canvas canvas, Size size) {
+    if (features.isEmpty || size.width <= 0 || size.height <= 0) {
       return;
     }
 
-    final bounds =
-        _calculateBounds();
+    final bounds = _calculateBounds();
 
     if (bounds == null) {
       return;
     }
 
-    final baseTransform =
-        _MapTransform.create(
+    final baseTransform = _MapTransform.create(
       bounds: bounds,
       canvasSize: size,
     );
 
     canvas.save();
 
-    final center = Offset(
-      size.width / 2,
-      size.height / 2,
-    );
+    final center = Offset(size.width / 2, size.height / 2);
 
-    canvas.translate(
-      center.dx + pan.dx,
-      center.dy + pan.dy,
-    );
+    canvas.translate(center.dx + pan.dx, center.dy + pan.dy);
 
-    canvas.scale(
-      zoom,
-      zoom,
-    );
+    canvas.scale(zoom, zoom);
 
-    canvas.translate(
-      -center.dx,
-      -center.dy,
-    );
+    canvas.translate(-center.dx, -center.dy);
 
     final geometryPaint = Paint()
-      ..color =
-          const Color(0xFF1565C0)
+      ..color = const Color(0xFF1565C0)
       ..strokeWidth = 1.5 / zoom
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     final pointPaint = Paint()
-      ..color =
-          const Color(0xFFD32F2F)
+      ..color = const Color(0xFFD32F2F)
       ..style = PaintingStyle.fill;
 
     for (final feature in features) {
       switch (feature.type) {
         case MapFeatureType.point:
-          _drawPoint(
-            canvas,
-            feature,
-            baseTransform,
-            pointPaint,
-          );
+          _drawPoint(canvas, feature, baseTransform, pointPaint);
           break;
 
         case MapFeatureType.line:
-          _drawLine(
-            canvas,
-            feature,
-            baseTransform,
-            geometryPaint,
-          );
+          _drawLine(canvas, feature, baseTransform, geometryPaint);
           break;
 
         case MapFeatureType.polyline:
@@ -2367,6 +1839,7 @@ class _MapProjectPainter
           break;
 
         case MapFeatureType.text:
+          _drawText(canvas, feature, baseTransform);
           break;
       }
     }
@@ -2381,51 +1854,22 @@ class _MapProjectPainter
     double? maxY;
 
     for (final feature in features) {
-      for (final coordinate
-          in feature.coordinates) {
-        minX = minX == null
-            ? coordinate.x
-            : math.min(
-                minX,
-                coordinate.x,
-              );
+      for (final coordinate in feature.coordinates) {
+        minX = minX == null ? coordinate.x : math.min(minX, coordinate.x);
 
-        minY = minY == null
-            ? coordinate.y
-            : math.min(
-                minY,
-                coordinate.y,
-              );
+        minY = minY == null ? coordinate.y : math.min(minY, coordinate.y);
 
-        maxX = maxX == null
-            ? coordinate.x
-            : math.max(
-                maxX,
-                coordinate.x,
-              );
+        maxX = maxX == null ? coordinate.x : math.max(maxX, coordinate.x);
 
-        maxY = maxY == null
-            ? coordinate.y
-            : math.max(
-                maxY,
-                coordinate.y,
-              );
+        maxY = maxY == null ? coordinate.y : math.max(maxY, coordinate.y);
       }
     }
 
-    if (minX == null ||
-        minY == null ||
-        maxX == null ||
-        maxY == null) {
+    if (minX == null || minY == null || maxX == null || maxY == null) {
       return null;
     }
 
-    return _MapBounds(
-      minX: minX,
-      minY: minY,
-      maxX: maxX,
-      maxY: maxY,
-    );
+    return _MapBounds(minX: minX, minY: minY, maxX: maxX, maxY: maxY);
   }
 
   void _drawPoint(
@@ -2438,16 +1882,9 @@ class _MapProjectPainter
       return;
     }
 
-    final position =
-        transform.toCanvas(
-      feature.coordinates.first,
-    );
+    final position = transform.toCanvas(feature.coordinates.first);
 
-    canvas.drawCircle(
-      position,
-      3.5 / zoom,
-      paint,
-    );
+    canvas.drawCircle(position, 3.5 / zoom, paint);
   }
 
   void _drawLine(
@@ -2456,26 +1893,15 @@ class _MapProjectPainter
     _MapTransform transform,
     Paint paint,
   ) {
-    if (feature.coordinates.length <
-        2) {
+    if (feature.coordinates.length < 2) {
       return;
     }
 
-    final start =
-        transform.toCanvas(
-      feature.coordinates[0],
-    );
+    final start = transform.toCanvas(feature.coordinates[0]);
 
-    final end =
-        transform.toCanvas(
-      feature.coordinates[1],
-    );
+    final end = transform.toCanvas(feature.coordinates[1]);
 
-    canvas.drawLine(
-      start,
-      end,
-      paint,
-    );
+    canvas.drawLine(start, end, paint);
   }
 
   void _drawPolyline(
@@ -2485,55 +1911,67 @@ class _MapProjectPainter
     Paint paint, {
     required bool closePath,
   }) {
-    if (feature.coordinates.length <
-        2) {
+    if (feature.coordinates.length < 2) {
       return;
     }
 
     final path = Path();
 
-    final first =
-        transform.toCanvas(
-      feature.coordinates.first,
-    );
+    final first = transform.toCanvas(feature.coordinates.first);
 
-    path.moveTo(
-      first.dx,
-      first.dy,
-    );
+    path.moveTo(first.dx, first.dy);
 
-    for (var index = 1;
-        index <
-            feature.coordinates.length;
-        index++) {
-      final position =
-          transform.toCanvas(
-        feature.coordinates[index],
-      );
+    for (var index = 1; index < feature.coordinates.length; index++) {
+      final position = transform.toCanvas(feature.coordinates[index]);
 
-      path.lineTo(
-        position.dx,
-        position.dy,
-      );
+      path.lineTo(position.dx, position.dy);
     }
 
     if (closePath) {
       path.close();
     }
 
-    canvas.drawPath(
-      path,
-      paint,
-    );
+    canvas.drawPath(path, paint);
+  }
+
+  void _drawText(Canvas canvas, MapFeature feature, _MapTransform transform) {
+    if (feature.coordinates.isEmpty) {
+      return;
+    }
+
+    final content = feature.properties['text'] ?? feature.name;
+
+    if (content.isEmpty) {
+      return;
+    }
+
+    final position = transform.toCanvas(feature.coordinates.first);
+
+    final rotationDegrees =
+        double.tryParse(feature.properties['rotationDegrees'] ?? '') ?? 0;
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: content,
+        style: TextStyle(
+          color: const Color(0xFF5E35B1),
+          fontSize: 13 / zoom,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: 320 / zoom);
+
+    canvas.save();
+    canvas.translate(position.dx, position.dy);
+    canvas.rotate(-rotationDegrees * math.pi / 180);
+    textPainter.paint(canvas, Offset(4 / zoom, -textPainter.height / 2));
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(
-    covariant _MapProjectPainter
-        oldDelegate,
-  ) {
-    return oldDelegate.features !=
-            features ||
+  bool shouldRepaint(covariant _MapProjectPainter oldDelegate) {
+    return oldDelegate.features != features ||
         oldDelegate.zoom != zoom ||
         oldDelegate.pan != pan;
   }
@@ -2574,11 +2012,9 @@ class _MapBounds {
     required this.maxY,
   });
 
-  double get width =>
-      maxX - minX;
+  double get width => maxX - minX;
 
-  double get height =>
-      maxY - minY;
+  double get height => maxY - minY;
 }
 
 class _MapTransform {
@@ -2603,61 +2039,27 @@ class _MapTransform {
   }) {
     const padding = 40.0;
 
-    final availableWidth =
-        math.max(
-      1.0,
-      canvasSize.width -
-          padding * 2,
-    );
+    final availableWidth = math.max(1.0, canvasSize.width - padding * 2);
 
-    final availableHeight =
-        math.max(
-      1.0,
-      canvasSize.height -
-          padding * 2,
-    );
+    final availableHeight = math.max(1.0, canvasSize.height - padding * 2);
 
-    final geometryWidth =
-        math.max(
-      bounds.width,
-      0.000001,
-    );
+    final geometryWidth = math.max(bounds.width, 0.000001);
 
-    final geometryHeight =
-        math.max(
-      bounds.height,
-      0.000001,
-    );
+    final geometryHeight = math.max(bounds.height, 0.000001);
 
-    final scaleX =
-        availableWidth /
-        geometryWidth;
+    final scaleX = availableWidth / geometryWidth;
 
-    final scaleY =
-        availableHeight /
-        geometryHeight;
+    final scaleY = availableHeight / geometryHeight;
 
-    final scale =
-        math.min(
-      scaleX,
-      scaleY,
-    );
+    final scale = math.min(scaleX, scaleY);
 
-    final drawnWidth =
-        bounds.width * scale;
+    final drawnWidth = bounds.width * scale;
 
-    final drawnHeight =
-        bounds.height * scale;
+    final drawnHeight = bounds.height * scale;
 
-    final offsetX =
-        (canvasSize.width -
-                drawnWidth) /
-            2;
+    final offsetX = (canvasSize.width - drawnWidth) / 2;
 
-    final offsetY =
-        (canvasSize.height -
-                drawnHeight) /
-            2;
+    final offsetY = (canvasSize.height - drawnHeight) / 2;
 
     return _MapTransform(
       bounds: bounds,
@@ -2668,26 +2070,13 @@ class _MapTransform {
     );
   }
 
-  Offset toCanvas(
-    MapCoordinate coordinate,
-  ) {
-    final x =
-        offsetX +
-        (coordinate.x -
-                bounds.minX) *
-            scale;
+  Offset toCanvas(MapCoordinate coordinate) {
+    final x = offsetX + (coordinate.x - bounds.minX) * scale;
 
     final y =
-        canvasSize.height -
-        offsetY -
-        (coordinate.y -
-                bounds.minY) *
-            scale;
+        canvasSize.height - offsetY - (coordinate.y - bounds.minY) * scale;
 
-    return Offset(
-      x,
-      y,
-    );
+    return Offset(x, y);
   }
 
   Offset toScreen(
@@ -2695,23 +2084,13 @@ class _MapTransform {
     required double zoom,
     required Offset pan,
   }) {
-    final base =
-        toCanvas(coordinate);
+    final base = toCanvas(coordinate);
 
-    final center = Offset(
-      canvasSize.width / 2,
-      canvasSize.height / 2,
-    );
+    final center = Offset(canvasSize.width / 2, canvasSize.height / 2);
 
     return Offset(
-      center.dx +
-          (base.dx - center.dx) *
-              zoom +
-          pan.dx,
-      center.dy +
-          (base.dy - center.dy) *
-              zoom +
-          pan.dy,
+      center.dx + (base.dx - center.dx) * zoom + pan.dx,
+      center.dy + (base.dy - center.dy) * zoom + pan.dy,
     );
   }
 
@@ -2720,40 +2099,16 @@ class _MapTransform {
     required double zoom,
     required Offset pan,
   }) {
-    final center = Offset(
-      canvasSize.width / 2,
-      canvasSize.height / 2,
-    );
+    final center = Offset(canvasSize.width / 2, canvasSize.height / 2);
 
-    final baseX =
-        center.dx +
-        (canvasPosition.dx -
-                center.dx -
-                pan.dx) /
-            zoom;
+    final baseX = center.dx + (canvasPosition.dx - center.dx - pan.dx) / zoom;
 
-    final baseY =
-        center.dy +
-        (canvasPosition.dy -
-                center.dy -
-                pan.dy) /
-            zoom;
+    final baseY = center.dy + (canvasPosition.dy - center.dy - pan.dy) / zoom;
 
-    final x =
-        bounds.minX +
-        (baseX - offsetX) /
-            scale;
+    final x = bounds.minX + (baseX - offsetX) / scale;
 
-    final y =
-        bounds.minY +
-        (canvasSize.height -
-                offsetY -
-                baseY) /
-            scale;
+    final y = bounds.minY + (canvasSize.height - offsetY - baseY) / scale;
 
-    return MapCoordinate(
-      x: x,
-      y: y,
-    );
+    return MapCoordinate(x: x, y: y);
   }
 }
