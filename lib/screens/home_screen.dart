@@ -12,6 +12,7 @@ import '../models/map_layer.dart';
 import '../models/map_project.dart';
 import '../services/cad_file_service.dart';
 import '../services/dxf_parser_service.dart';
+import '../services/dxf_export_service.dart';
 import '../services/project_history_service.dart';
 import '../services/project_persistence_service.dart';
 import '../services/project_dirty_state_service.dart';
@@ -28,12 +29,17 @@ class HomeScreen extends StatefulWidget {
   final MapProject? initialProject;
   final Future<bool> Function(MapProject project)? saveProjectOverride;
   final Future<GeoCadProjectDocument?> Function()? openProjectOverride;
+  final Future<Uri?> Function(Uint8List bytes)? saveDxfOverride;
+  final Future<CoordinateReferenceSystem?> Function(MapLayer layer)?
+  selectUtmCrsOverride;
 
   const HomeScreen({
     super.key,
     this.initialProject,
     this.saveProjectOverride,
     this.openProjectOverride,
+    this.saveDxfOverride,
+    this.selectUtmCrsOverride,
   });
 
   @override
@@ -43,6 +49,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final CadFileService _cadFileService = const CadFileService();
   final DxfParserService _dxfParserService = const DxfParserService();
+  final DxfExportService _dxfExportService = const DxfExportService();
   final LayerReprojectionService _layerReprojectionService =
       const LayerReprojectionService();
   final LayerGeoreferenceService _layerGeoreferenceService =
@@ -859,6 +866,45 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _createUtmLayer(MapLayer sourceLayer) async {
+    if (_isProjectBusy || _isImporting || _isExporting) return;
+    if (!sourceLayer.crs.isWgs84 || sourceLayer.features.isEmpty) {
+      _showMessage('Chỉ có thể tạo UTM từ layer WGS84 có dữ liệu hình học.');
+      return;
+    }
+
+    final targetCrs = widget.selectUtmCrsOverride != null
+        ? await widget.selectUtmCrsOverride!(sourceLayer)
+        : mounted
+        ? await _showUtmTargetDialog(context)
+        : null;
+    if (targetCrs == null || !mounted) return;
+    if (!targetCrs.isUtm || !targetCrs.isValid) {
+      _showMessage('CRS UTM đích không hợp lệ.');
+      return;
+    }
+
+    try {
+      final result = _layerReprojectionService.reprojectLayer(
+        sourceLayer: sourceLayer,
+        targetCrs: targetCrs,
+        newLayerId: _createLayerId(),
+        newLayerName: '${sourceLayer.name} - ${targetCrs.displayName}',
+      );
+      _recordHistory();
+      setState(() {
+        _project = _project.addLayer(result.layer);
+      });
+      _showMessage(
+        'Đã tạo layer ${targetCrs.displayName}: '
+        '${result.transformedFeatureCount} đối tượng, '
+        '${result.transformedCoordinateCount} tọa độ.',
+      );
+    } catch (error) {
+      _showMessage('Không thể tạo layer UTM: $error');
+    }
+  }
+
   Future<void> _openCoordinateConverter() async {
     await showDialog<void>(
       context: context,
@@ -919,6 +965,57 @@ class _HomeScreenState extends State<HomeScreen> {
       await _showKmlExportSuccessDialog(outputUri);
     } catch (error) {
       _showMessage('Không thể xuất KML: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _exportDxf() async {
+    if (_isExporting || _isImporting || _isProjectBusy) return;
+
+    DxfExportResult result;
+    try {
+      result = _dxfExportService.serialize(
+        documentName: _project.name,
+        layers: _project.layers,
+      );
+    } catch (error) {
+      _showMessage('Không thể xuất DXF: $error');
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+    try {
+      final outputUri = widget.saveDxfOverride != null
+          ? await widget.saveDxfOverride!(result.bytes)
+          : await FilePicker.saveFile(
+              dialogTitle: 'Xuất bản vẽ AutoCAD (DXF ASCII)',
+              fileName: '${_safeFileName(_project.name)}.dxf',
+              bytes: result.bytes,
+              mimeType: 'application/dxf',
+              type: FileType.custom,
+              allowedExtensions: const ['dxf'],
+            );
+      if (outputUri == null || !mounted) return;
+      final path = outputUri.scheme == 'file'
+          ? outputUri.toFilePath(windows: Platform.isWindows)
+          : outputUri.toString();
+      final warnings = result.warnings.isEmpty
+          ? ''
+          : ' • ${result.warnings.length} cảnh báo';
+      _showMessage(
+        'Đã xuất ${result.entityCount} đối tượng trên '
+        '${result.layerCount} CAD layer • '
+        '${result.exportedCrs.displayName}$warnings • $path',
+      );
+    } catch (error) {
+      _showMessage('Không thể ghi file DXF: $error');
     } finally {
       if (mounted) {
         setState(() {
@@ -1145,8 +1242,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       onOpenGoogleEarthFiles: _openGoogleEarthFiles,
                       onOpenCoordinateConverter: _openCoordinateConverter,
                       onExportKml: _exportKml,
+                      onExportDxf: _exportDxf,
                       onUpdateLayerCrs: _updateLayerCrs,
                       onCreateWgs84Layer: _createWgs84Layer,
+                      onCreateUtmLayer: _createUtmLayer,
                       onGeoreferenceLayer: _georeferenceLayer,
                       onToggleVisibility: _toggleLayerVisibility,
                       onToggleLock: _toggleLayerLock,
@@ -1190,9 +1289,11 @@ class _LeftPanel extends StatelessWidget {
   final VoidCallback onOpenGoogleEarthFiles;
   final VoidCallback onOpenCoordinateConverter;
   final VoidCallback onExportKml;
+  final VoidCallback onExportDxf;
   final void Function(MapLayer layer, CoordinateReferenceSystem crs)
   onUpdateLayerCrs;
   final ValueChanged<MapLayer> onCreateWgs84Layer;
+  final ValueChanged<MapLayer> onCreateUtmLayer;
   final ValueChanged<MapLayer> onGeoreferenceLayer;
   final ValueChanged<MapLayer> onToggleVisibility;
   final ValueChanged<MapLayer> onToggleLock;
@@ -1208,8 +1309,10 @@ class _LeftPanel extends StatelessWidget {
     required this.onOpenGoogleEarthFiles,
     required this.onOpenCoordinateConverter,
     required this.onExportKml,
+    required this.onExportDxf,
     required this.onUpdateLayerCrs,
     required this.onCreateWgs84Layer,
+    required this.onCreateUtmLayer,
     required this.onGeoreferenceLayer,
     required this.onToggleVisibility,
     required this.onToggleLock,
@@ -1280,9 +1383,9 @@ class _LeftPanel extends StatelessWidget {
                 const SizedBox(height: 10),
                 _ToolButton(
                   icon: Icons.architecture,
-                  title: 'Xuất sang AutoCAD',
-                  subtitle: 'DXF / DWG',
-                  onPressed: () {},
+                  title: isExporting ? 'Đang xuất DXF...' : 'Xuất sang AutoCAD',
+                  subtitle: 'DXF ASCII',
+                  onPressed: isImporting || isExporting ? null : onExportDxf,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
@@ -1346,6 +1449,9 @@ class _LeftPanel extends StatelessWidget {
                         onCreateWgs84: () {
                           onCreateWgs84Layer(layer);
                         },
+                        onCreateUtm: () {
+                          onCreateUtmLayer(layer);
+                        },
                         onGeoreference: () {
                           onGeoreferenceLayer(layer);
                         },
@@ -1375,6 +1481,96 @@ class _LeftPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<CoordinateReferenceSystem?> _showUtmTargetDialog(
+  BuildContext context,
+) async {
+  var zone = 48;
+  var hemisphere = UtmHemisphere.north;
+
+  return showDialog<CoordinateReferenceSystem>(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Tạo layer UTM'),
+            content: SizedBox(
+              width: 480,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      initialValue: zone,
+                      decoration: const InputDecoration(
+                        labelText: 'UTM Zone',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: List.generate(
+                        60,
+                        (index) => DropdownMenuItem(
+                          value: index + 1,
+                          child: Text('Zone ${index + 1}'),
+                        ),
+                      ),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() => zone = value);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<UtmHemisphere>(
+                      initialValue: hemisphere,
+                      decoration: const InputDecoration(
+                        labelText: 'Bán cầu',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: UtmHemisphere.north,
+                          child: Text('Bắc (North)'),
+                        ),
+                        DropdownMenuItem(
+                          value: UtmHemisphere.south,
+                          child: Text('Nam (South)'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() => hemisphere = value);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Hủy'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(context).pop(
+                    CoordinateReferenceSystem.utm(
+                      utmZone: zone,
+                      hemisphere: hemisphere,
+                    ),
+                  );
+                },
+                child: const Text('Tạo layer'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }
 
 Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
@@ -1663,6 +1859,7 @@ class _LayerCard extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onEditCrs;
   final VoidCallback onCreateWgs84;
+  final VoidCallback onCreateUtm;
   final VoidCallback onGeoreference;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
@@ -1676,6 +1873,7 @@ class _LayerCard extends StatelessWidget {
     required this.onRemove,
     required this.onEditCrs,
     required this.onCreateWgs84,
+    required this.onCreateUtm,
     required this.onGeoreference,
     required this.onMoveUp,
     required this.onMoveDown,
@@ -1798,15 +1996,18 @@ class _LayerCard extends StatelessWidget {
                     : null,
                 icon: const Icon(Icons.add_location_alt_outlined),
               ),
-              IconButton(
-                tooltip: layer.crs.isWgs84
-                    ? 'Layer đã là WGS84'
-                    : 'Tạo layer WGS84',
-                onPressed: layer.canTransformToWgs84 && !layer.crs.isWgs84
-                    ? onCreateWgs84
-                    : null,
-                icon: const Icon(Icons.public),
-              ),
+              if (layer.crs.isWgs84)
+                IconButton(
+                  tooltip: 'Tạo layer UTM',
+                  onPressed: layer.features.isEmpty ? null : onCreateUtm,
+                  icon: const Icon(Icons.grid_on),
+                )
+              else
+                IconButton(
+                  tooltip: 'Tạo layer WGS84',
+                  onPressed: layer.canTransformToWgs84 ? onCreateWgs84 : null,
+                  icon: const Icon(Icons.public),
+                ),
               IconButton(
                 tooltip: 'Thiết lập hệ tọa độ (CRS)',
                 onPressed: onEditCrs,
