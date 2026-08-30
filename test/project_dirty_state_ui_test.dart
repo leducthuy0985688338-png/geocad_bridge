@@ -4,6 +4,7 @@ import 'dart:ui' show AppExitResponse;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:autocad_googleearth/models/coordinate_reference_system.dart';
 import 'package:autocad_googleearth/models/map_layer.dart';
 import 'package:autocad_googleearth/models/map_project.dart';
 import 'package:autocad_googleearth/screens/home_screen.dart';
@@ -25,6 +26,7 @@ void main() {
 
   Future<void> pumpHome(
     WidgetTester tester, {
+    MapProject project = initialProject,
     Future<bool> Function(MapProject)? save,
     Future<GeoCadProjectDocument?> Function()? open,
   }) async {
@@ -35,7 +37,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
-          initialProject: initialProject,
+          initialProject: project,
           saveProjectOverride: save,
           openProjectOverride: open,
         ),
@@ -59,6 +61,62 @@ void main() {
     await pumpHome(tester);
     expect(title(tester), isNot(endsWith(' *')));
     await makeDirty(tester);
+  });
+
+  testWidgets('known WGS84 and UTM layers cannot be metadata relabeled', (
+    tester,
+  ) async {
+    const knownProject = MapProject(
+      id: 'known',
+      name: 'Known CRS',
+      layers: [
+        MapLayer(
+          id: 'wgs',
+          name: 'WGS Layer',
+          sourceType: MapLayerSourceType.kml,
+          crs: CoordinateReferenceSystem.wgs84(),
+        ),
+        MapLayer(
+          id: 'utm',
+          name: 'UTM Layer',
+          sourceType: MapLayerSourceType.dxf,
+          crs: CoordinateReferenceSystem.utm(
+            utmZone: 48,
+            hemisphere: UtmHemisphere.north,
+          ),
+        ),
+      ],
+    );
+
+    await pumpHome(tester, project: knownProject);
+
+    expect(find.text('WGS84 (EPSG:4326)'), findsOneWidget);
+    expect(find.text('UTM Zone 48N'), findsOneWidget);
+    expect(
+      find.byTooltip('CRS đã xác định; hãy dùng chuyển đổi tọa độ'),
+      findsNWidgets(2),
+    );
+
+    await tester.tap(
+      find.byTooltip('CRS đã xác định; hãy dùng chuyển đổi tọa độ').first,
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gán hệ tọa độ nguồn'), findsNothing);
+    expect(title(tester), isNot(endsWith(' *')));
+  });
+
+  testWidgets('local CAD layer exposes source CRS assignment workflow', (
+    tester,
+  ) async {
+    await pumpHome(tester);
+
+    await tester.tap(find.byTooltip('Gán hệ tọa độ nguồn'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gán hệ tọa độ nguồn'), findsOneWidget);
+    expect(find.textContaining('chỉ khai báo CRS của layer'), findsOneWidget);
   });
 
   testWidgets('transient canvas pan does not mark project dirty', (

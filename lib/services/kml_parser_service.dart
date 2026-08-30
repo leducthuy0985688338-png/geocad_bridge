@@ -41,9 +41,7 @@ class KmlParserService {
     try {
       document = XmlDocument.parse(content);
     } on XmlParserException catch (error) {
-      throw FormatException(
-        'KML không hợp lệ: ${error.message}',
-      );
+      throw FormatException('KML không hợp lệ: ${error.message}');
     }
 
     final features = <MapFeature>[];
@@ -53,35 +51,37 @@ class KmlParserService {
     var polygonCount = 0;
     var featureIndex = 0;
 
-    final placemarks = document.descendants
-        .whereType<XmlElement>()
-        .where((element) => element.name.local == 'Placemark');
+    final placemarks = document.descendants.whereType<XmlElement>().where(
+      (element) => element.name.local == 'Placemark',
+    );
 
     for (final placemark in placemarks) {
       placemarkCount++;
 
       final name = _firstChildText(placemark, 'name') ?? '';
-      final description =
-          _firstChildText(placemark, 'description');
+      final description = _firstChildText(placemark, 'description');
       final properties = _readExtendedData(placemark);
 
-      final geometries = placemark.descendants
-          .whereType<XmlElement>()
-          .where((element) {
+      final geometries = placemark.descendants.whereType<XmlElement>().where((
+        element,
+      ) {
         final name = element.name.local;
-        return name == 'Point' ||
-            name == 'LineString' ||
-            name == 'Polygon';
+        return name == 'Point' || name == 'LineString' || name == 'Polygon';
       });
 
       for (final geometry in geometries) {
         final localName = geometry.name.local;
 
         if (localName == 'Point') {
-          final coordinates =
-              _coordinatesFromGeometry(geometry);
+          final coordinates = _coordinatesFromGeometry(
+            geometry,
+            placemarkName: name,
+            geometryType: localName,
+          );
 
-          if (coordinates.isEmpty) continue;
+          if (coordinates.length != 1) {
+            throw _geometryError(name, localName, 'phải có đúng 1 bộ tọa độ');
+          }
 
           featureIndex++;
           pointCount++;
@@ -93,17 +93,23 @@ class KmlParserService {
               coordinates: [coordinates.first],
               name: name,
               description: description,
-              properties: {
-                ...properties,
-                'kmlGeometry': 'Point',
-              },
+              properties: {...properties, 'kmlGeometry': 'Point'},
             ),
           );
         } else if (localName == 'LineString') {
-          final coordinates =
-              _coordinatesFromGeometry(geometry);
+          final coordinates = _coordinatesFromGeometry(
+            geometry,
+            placemarkName: name,
+            geometryType: localName,
+          );
 
-          if (coordinates.length < 2) continue;
+          if (coordinates.length < 2) {
+            throw _geometryError(
+              name,
+              localName,
+              'phải có ít nhất 2 bộ tọa độ',
+            );
+          }
 
           featureIndex++;
           lineStringCount++;
@@ -115,33 +121,47 @@ class KmlParserService {
               coordinates: coordinates,
               name: name,
               description: description,
-              properties: {
-                ...properties,
-                'kmlGeometry': 'LineString',
-              },
+              properties: {...properties, 'kmlGeometry': 'LineString'},
             ),
           );
         } else if (localName == 'Polygon') {
-          final outerBoundary =
-              _firstDescendant(
-            geometry,
-            'outerBoundaryIs',
+          final hasInnerBoundary = geometry.descendants
+              .whereType<XmlElement>()
+              .any((element) => element.name.local == 'innerBoundaryIs');
+
+          if (hasInnerBoundary) {
+            throw _geometryError(
+              name,
+              localName,
+              'chưa hỗ trợ innerBoundaryIs (polygon có lỗ)',
+            );
+          }
+
+          final outerBoundary = _firstDescendant(geometry, 'outerBoundaryIs');
+
+          if (outerBoundary == null) {
+            throw _geometryError(name, localName, 'thiếu outerBoundaryIs');
+          }
+
+          final linearRing = _firstDescendant(outerBoundary, 'LinearRing');
+
+          if (linearRing == null) {
+            throw _geometryError(name, localName, 'thiếu LinearRing');
+          }
+
+          final coordinates = _coordinatesFromGeometry(
+            linearRing,
+            placemarkName: name,
+            geometryType: localName,
           );
 
-          if (outerBoundary == null) continue;
-
-          final linearRing =
-              _firstDescendant(
-            outerBoundary,
-            'LinearRing',
-          );
-
-          if (linearRing == null) continue;
-
-          final coordinates =
-              _coordinatesFromGeometry(linearRing);
-
-          if (coordinates.length < 3) continue;
+          if (coordinates.length < 3) {
+            throw _geometryError(
+              name,
+              localName,
+              'phải có ít nhất 3 bộ tọa độ',
+            );
+          }
 
           featureIndex++;
           polygonCount++;
@@ -153,10 +173,7 @@ class KmlParserService {
               coordinates: coordinates,
               name: name,
               description: description,
-              properties: {
-                ...properties,
-                'kmlGeometry': 'Polygon',
-              },
+              properties: {...properties, 'kmlGeometry': 'Polygon'},
             ),
           );
         }
@@ -173,17 +190,28 @@ class KmlParserService {
   }
 
   List<MapCoordinate> _coordinatesFromGeometry(
-    XmlElement geometry,
-  ) {
-    final element =
-        _firstDescendant(geometry, 'coordinates');
+    XmlElement geometry, {
+    required String placemarkName,
+    required String geometryType,
+  }) {
+    final element = _firstDescendant(geometry, 'coordinates');
 
-    if (element == null) return const [];
+    if (element == null) {
+      throw _geometryError(placemarkName, geometryType, 'thiếu coordinates');
+    }
 
-    return _parseCoordinates(element.innerText);
+    return _parseCoordinates(
+      element.innerText,
+      placemarkName: placemarkName,
+      geometryType: geometryType,
+    );
   }
 
-  List<MapCoordinate> _parseCoordinates(String raw) {
+  List<MapCoordinate> _parseCoordinates(
+    String raw, {
+    required String placemarkName,
+    required String geometryType,
+  }) {
     final result = <MapCoordinate>[];
 
     final tuples = raw
@@ -191,65 +219,123 @@ class KmlParserService {
         .split(RegExp(r'\s+'))
         .where((item) => item.trim().isNotEmpty);
 
+    var tupleIndex = 0;
     for (final tuple in tuples) {
+      tupleIndex++;
       final parts = tuple.split(',');
 
-      if (parts.length < 2) continue;
+      if (parts.length < 2 || parts.length > 3) {
+        throw _coordinateError(
+          placemarkName,
+          geometryType,
+          tupleIndex,
+          tuple,
+          'phải có dạng longitude,latitude[,altitude]',
+        );
+      }
 
-      final longitude =
-          double.tryParse(parts[0].trim());
-      final latitude =
-          double.tryParse(parts[1].trim());
+      final longitude = double.tryParse(parts[0].trim());
+      final latitude = double.tryParse(parts[1].trim());
 
-      if (longitude == null || latitude == null) {
-        continue;
+      if (longitude == null ||
+          latitude == null ||
+          !longitude.isFinite ||
+          !latitude.isFinite) {
+        throw _coordinateError(
+          placemarkName,
+          geometryType,
+          tupleIndex,
+          tuple,
+          'longitude/latitude phải là số hữu hạn',
+        );
+      }
+
+      if (longitude < -180 || longitude > 180) {
+        throw _coordinateError(
+          placemarkName,
+          geometryType,
+          tupleIndex,
+          tuple,
+          'longitude phải nằm trong [-180, 180]',
+        );
+      }
+
+      if (latitude < -90 || latitude > 90) {
+        throw _coordinateError(
+          placemarkName,
+          geometryType,
+          tupleIndex,
+          tuple,
+          'latitude phải nằm trong [-90, 90]',
+        );
       }
 
       double? altitude;
 
-      if (parts.length >= 3 &&
-          parts[2].trim().isNotEmpty) {
-        altitude =
-            double.tryParse(parts[2].trim());
+      if (parts.length >= 3 && parts[2].trim().isNotEmpty) {
+        altitude = double.tryParse(parts[2].trim());
+        if (altitude == null || !altitude.isFinite) {
+          throw _coordinateError(
+            placemarkName,
+            geometryType,
+            tupleIndex,
+            tuple,
+            'altitude phải là số hữu hạn',
+          );
+        }
       }
 
-      result.add(
-        MapCoordinate(
-          x: longitude,
-          y: latitude,
-          z: altitude,
-        ),
-      );
+      result.add(MapCoordinate(x: longitude, y: latitude, z: altitude));
     }
 
     return result;
   }
 
-  Map<String, String> _readExtendedData(
-    XmlElement placemark,
+  FormatException _geometryError(
+    String placemarkName,
+    String geometryType,
+    String message,
   ) {
+    final displayName = placemarkName.isEmpty ? '(không tên)' : placemarkName;
+    return FormatException(
+      'Placemark "$displayName", $geometryType: $message.',
+    );
+  }
+
+  FormatException _coordinateError(
+    String placemarkName,
+    String geometryType,
+    int tupleIndex,
+    String tuple,
+    String message,
+  ) {
+    return _geometryError(
+      placemarkName,
+      geometryType,
+      'tọa độ #$tupleIndex "$tuple" không hợp lệ: $message',
+    );
+  }
+
+  Map<String, String> _readExtendedData(XmlElement placemark) {
     final result = <String, String>{};
 
-    for (final data in placemark.descendants
-        .whereType<XmlElement>()
-        .where((element) => element.name.local == 'Data')) {
+    for (final data in placemark.descendants.whereType<XmlElement>().where(
+      (element) => element.name.local == 'Data',
+    )) {
       final key = data.getAttribute('name');
 
       if (key == null || key.isEmpty) continue;
 
-      final valueElement =
-          _firstDescendant(data, 'value');
+      final valueElement = _firstDescendant(data, 'value');
 
       if (valueElement != null) {
         result[key] = valueElement.innerText.trim();
       }
     }
 
-    for (final simpleData in placemark.descendants
-        .whereType<XmlElement>()
-        .where(
-          (element) =>
-              element.name.local == 'SimpleData',
+    for (final simpleData
+        in placemark.descendants.whereType<XmlElement>().where(
+          (element) => element.name.local == 'SimpleData',
         )) {
       final key = simpleData.getAttribute('name');
 
@@ -261,12 +347,8 @@ class KmlParserService {
     return result;
   }
 
-  String? _firstChildText(
-    XmlElement parent,
-    String localName,
-  ) {
-    for (final child
-        in parent.children.whereType<XmlElement>()) {
+  String? _firstChildText(XmlElement parent, String localName) {
+    for (final child in parent.children.whereType<XmlElement>()) {
       if (child.name.local == localName) {
         final value = child.innerText.trim();
         return value.isEmpty ? null : value;
@@ -276,12 +358,8 @@ class KmlParserService {
     return null;
   }
 
-  XmlElement? _firstDescendant(
-    XmlElement parent,
-    String localName,
-  ) {
-    for (final element
-        in parent.descendants.whereType<XmlElement>()) {
+  XmlElement? _firstDescendant(XmlElement parent, String localName) {
+    for (final element in parent.descendants.whereType<XmlElement>()) {
       if (element.name.local == localName) {
         return element;
       }

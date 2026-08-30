@@ -129,4 +129,102 @@ void main() {
     expect(result.lineStringCount, 1);
     expect(result.features.length, 2);
   });
+
+  group('strict coordinate validation', () {
+    test('rejects malformed tuple without partially importing geometry', () {
+      const kml = '''
+<kml><Placemark><name>Tuyến lỗi</name><LineString><coordinates>
+106,16,0 invalid 106.2,16.2,0
+</coordinates></LineString></Placemark></kml>
+''';
+
+      expect(
+        () => service.parseString(kml),
+        throwsA(
+          isA<FormatException>()
+              .having(
+                (error) => error.message,
+                'message',
+                contains('Tuyến lỗi'),
+              )
+              .having((error) => error.message, 'message', contains('#2')),
+        ),
+      );
+    });
+
+    test('rejects non-finite longitude, latitude, and altitude', () {
+      for (final tuple in const [
+        'NaN,16',
+        '106,Infinity',
+        '106,16,-Infinity',
+      ]) {
+        final kml =
+            '<kml><Placemark><Point><coordinates>$tuple</coordinates>'
+            '</Point></Placemark></kml>';
+
+        expect(() => service.parseString(kml), throwsFormatException);
+      }
+    });
+
+    test('rejects coordinates outside WGS84 bounds', () {
+      for (final tuple in const [
+        '180.1,16',
+        '-180.1,16',
+        '106,90.1',
+        '106,-90.1',
+      ]) {
+        final kml =
+            '<kml><Placemark><Point><coordinates>$tuple</coordinates>'
+            '</Point></Placemark></kml>';
+
+        expect(() => service.parseString(kml), throwsFormatException);
+      }
+    });
+
+    test('rejects Point and LineString with insufficient coordinates', () {
+      const point =
+          '<kml><Placemark><Point><coordinates>106,16 107,17</coordinates>'
+          '</Point></Placemark></kml>';
+      const line =
+          '<kml><Placemark><LineString><coordinates>106,16</coordinates>'
+          '</LineString></Placemark></kml>';
+
+      expect(() => service.parseString(point), throwsFormatException);
+      expect(() => service.parseString(line), throwsFormatException);
+    });
+
+    test('rejects Polygon with incomplete outer ring', () {
+      const kml = '''
+<kml><Placemark><Polygon><outerBoundaryIs><LinearRing><coordinates>
+106,16 107,17
+</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></kml>
+''';
+
+      expect(() => service.parseString(kml), throwsFormatException);
+    });
+
+    test('rejects Polygon inner boundary instead of silently dropping it', () {
+      const kml = '''
+<kml><Placemark><name>Có lỗ</name><Polygon>
+<outerBoundaryIs><LinearRing><coordinates>
+106,16 107,16 107,17 106,16
+</coordinates></LinearRing></outerBoundaryIs>
+<innerBoundaryIs><LinearRing><coordinates>
+106.2,16.2 106.3,16.2 106.2,16.3 106.2,16.2
+</coordinates></LinearRing></innerBoundaryIs>
+</Polygon></Placemark></kml>
+''';
+
+      expect(
+        () => service.parseString(kml),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            contains('innerBoundaryIs'),
+          ),
+        ),
+      );
+    });
+  });
 }

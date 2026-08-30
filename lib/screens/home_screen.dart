@@ -1138,6 +1138,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _updateLayerCrs(MapLayer layer, CoordinateReferenceSystem crs) {
     if (_isProjectBusy) return;
+    if (!layer.crs.isLocalCad) {
+      _showMessage(
+        'CRS của "${layer.name}" đã được xác định. '
+        'Hãy dùng chức năng chuyển đổi tọa độ thay vì gán lại metadata.',
+      );
+      return;
+    }
     if (layer.crs.type == crs.type &&
         layer.crs.utmZone == crs.utmZone &&
         layer.crs.hemisphere == crs.hemisphere) {
@@ -1601,7 +1608,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
           }
 
           return AlertDialog(
-            title: const Text('Thiết lập hệ tọa độ layer'),
+            title: const Text('Gán hệ tọa độ nguồn'),
             content: SizedBox(
               width: 520,
               child: SingleChildScrollView(
@@ -1926,7 +1933,7 @@ class _LayerCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       InkWell(
-                        onTap: onEditCrs,
+                        onTap: layer.crs.isLocalCad ? onEditCrs : null,
                         borderRadius: BorderRadius.circular(4),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
@@ -2009,8 +2016,10 @@ class _LayerCard extends StatelessWidget {
                   icon: const Icon(Icons.public),
                 ),
               IconButton(
-                tooltip: 'Thiết lập hệ tọa độ (CRS)',
-                onPressed: onEditCrs,
+                tooltip: layer.crs.isLocalCad
+                    ? 'Gán hệ tọa độ nguồn'
+                    : 'CRS đã xác định; hãy dùng chuyển đổi tọa độ',
+                onPressed: layer.crs.isLocalCad ? onEditCrs : null,
                 icon: const Icon(Icons.language),
               ),
               IconButton(
