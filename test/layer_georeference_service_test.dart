@@ -523,4 +523,262 @@ void main() {
       returnsNormally,
     );
   });
+
+  test('list API with two points preserves legacy behavior', () {
+    final point1 = controlPoint(
+      localX: 10,
+      localY: 20,
+      targetX: 500000,
+      targetY: 1800000,
+    );
+    final point2 = controlPoint(
+      localX: 110,
+      localY: 20,
+      targetX: 500000,
+      targetY: 1800200,
+    );
+
+    final legacy = service.calculateTransform(point1: point1, point2: point2);
+    final fit = service.fitControlPoints(controlPoints: [point1, point2]);
+
+    expect(fit.method, LayerGeoreferenceService.twoPointMethod);
+    expect(fit.transform.scale, legacy.scale);
+    expect(fit.transform.rotationRadians, legacy.rotationRadians);
+    expect(fit.transform.translationX, legacy.translationX);
+    expect(fit.transform.translationY, legacy.translationY);
+    expect(fit.controlPointCount, 2);
+    expect(fit.rmse, closeTo(0, 1e-8));
+  });
+
+  test('solves an exact multi-point similarity dataset', () {
+    const points = [
+      GeoreferenceControlPoint(
+        local: MapCoordinate(x: 0, y: 0),
+        target: MapCoordinate(x: 500000, y: 1800000),
+      ),
+      GeoreferenceControlPoint(
+        local: MapCoordinate(x: 10, y: 0),
+        target: MapCoordinate(x: 500000, y: 1800020),
+      ),
+      GeoreferenceControlPoint(
+        local: MapCoordinate(x: 0, y: 10),
+        target: MapCoordinate(x: 499980, y: 1800000),
+      ),
+      GeoreferenceControlPoint(
+        local: MapCoordinate(x: 10, y: 10),
+        target: MapCoordinate(x: 499980, y: 1800020),
+      ),
+    ];
+
+    final fit = service.fitControlPoints(controlPoints: points);
+
+    expect(fit.method, LayerGeoreferenceService.leastSquaresMethod);
+    expect(fit.transform.scale, closeTo(2, 1e-12));
+    expect(fit.transform.rotationDegrees, closeTo(90, 1e-10));
+    expect(fit.transform.translationX, closeTo(500000, 1e-8));
+    expect(fit.transform.translationY, closeTo(1800000, 1e-8));
+    expect(fit.rmse, closeTo(0, 1e-8));
+    expect(
+      fit.residuals.map((residual) => residual.planarError),
+      everyElement(closeTo(0, 1e-8)),
+    );
+  });
+
+  test('computes deterministic noisy residuals RMSE and max index', () {
+    const points = [
+      GeoreferenceControlPoint(
+        local: MapCoordinate(x: -1, y: -1),
+        target: MapCoordinate(x: 99.1, y: 199),
+      ),
+      GeoreferenceControlPoint(
+        local: MapCoordinate(x: 1, y: -1),
+        target: MapCoordinate(x: 100.9, y: 199),
+      ),
+      GeoreferenceControlPoint(
+        local: MapCoordinate(x: 1, y: 1),
+        target: MapCoordinate(x: 101.1, y: 201),
+      ),
+      GeoreferenceControlPoint(
+        local: MapCoordinate(x: -1, y: 1),
+        target: MapCoordinate(x: 98.9, y: 201),
+      ),
+    ];
+
+    final fit = service.fitControlPoints(controlPoints: points);
+
+    expect(fit.transform.scale, closeTo(1, 1e-12));
+    expect(fit.transform.rotationDegrees, closeTo(0, 1e-10));
+    expect(fit.transform.translationX, closeTo(100, 1e-12));
+    expect(fit.transform.translationY, closeTo(200, 1e-12));
+    expect(fit.residuals.map((residual) => residual.deltaX).toList(), [
+      closeTo(-0.1, 1e-12),
+      closeTo(0.1, 1e-12),
+      closeTo(-0.1, 1e-12),
+      closeTo(0.1, 1e-12),
+    ]);
+    expect(
+      fit.residuals.map((residual) => residual.deltaY),
+      everyElement(closeTo(0, 1e-12)),
+    );
+    expect(fit.rmse, closeTo(0.1, 1e-12));
+    expect(fit.maxResidual.planarError, closeTo(0.1, 1e-12));
+    expect(fit.maxResidualIndex, 0);
+  });
+
+  test('accepts collinear multi-point control points', () {
+    final fit = service.fitControlPoints(
+      controlPoints: [
+        controlPoint(localX: 0, localY: 0, targetX: 100, targetY: 200),
+        controlPoint(localX: 10, localY: 0, targetX: 120, targetY: 200),
+        controlPoint(localX: 20, localY: 0, targetX: 140, targetY: 200),
+      ],
+    );
+
+    expect(fit.transform.scale, closeTo(2, 1e-12));
+    expect(fit.rmse, closeTo(0, 1e-10));
+  });
+
+  test('rejects fewer than two control points', () {
+    for (final points in <List<GeoreferenceControlPoint>>[
+      const [],
+      [controlPoint(localX: 0, localY: 0, targetX: 100, targetY: 200)],
+    ]) {
+      expect(
+        () => service.fitControlPoints(controlPoints: points),
+        throwsArgumentError,
+      );
+    }
+  });
+
+  test('rejects pairwise duplicate local and target points', () {
+    final valid = [
+      controlPoint(localX: 0, localY: 0, targetX: 100, targetY: 200),
+      controlPoint(localX: 10, localY: 0, targetX: 110, targetY: 200),
+    ];
+
+    expect(
+      () => service.fitControlPoints(
+        controlPoints: [
+          ...valid,
+          controlPoint(localX: 5e-10, localY: 0, targetX: 120, targetY: 200),
+        ],
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => service.fitControlPoints(
+        controlPoints: [
+          ...valid,
+          controlPoint(
+            localX: 20,
+            localY: 0,
+            targetX: 100 + 5e-10,
+            targetY: 200,
+          ),
+        ],
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('rejects a near-zero least-squares scale', () {
+    expect(
+      () => service.fitControlPoints(
+        controlPoints: [
+          controlPoint(localX: 0, localY: 0, targetX: 0, targetY: 0),
+          controlPoint(localX: 1e12, localY: 0, targetX: 0.001, targetY: 0),
+          controlPoint(localX: 0, localY: 1e12, targetX: 0, targetY: 0.001),
+        ],
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('stores multi-point quality metadata and immutable residuals', () {
+    final points = [
+      controlPoint(localX: 0, localY: 0, targetX: 500000, targetY: 1800000),
+      controlPoint(localX: 10, localY: 0, targetX: 500010, targetY: 1800000),
+      controlPoint(localX: 0, localY: 10, targetX: 500000, targetY: 1800010),
+    ];
+    final result = service.georeferenceLayerWithControlPoints(
+      sourceLayer: localPointLayer(),
+      controlPoints: points,
+      targetCrs: const CoordinateReferenceSystem.utm(
+        utmZone: 48,
+        hemisphere: UtmHemisphere.north,
+      ),
+    );
+
+    expect(result.controlPointCount, 3);
+    expect(
+      result.georeferenceMethod,
+      LayerGeoreferenceService.leastSquaresMethod,
+    );
+    expect(result.controlPointError, result.maxResidual!.planarError);
+    expect(result.layer.properties['georeferenceControlPointCount'], '3');
+    expect(
+      result.layer.properties['georeferenceMethod'],
+      LayerGeoreferenceService.leastSquaresMethod,
+    );
+    expect(result.layer.properties, contains('georeferenceRmse'));
+    expect(result.layer.properties, contains('georeferenceMaxResidual'));
+    expect(result.layer.properties, contains('georeferenceMaxResidualIndex'));
+    expect(
+      () => result.residuals.add(
+        const GeoreferenceResidual(
+          controlPointIndex: 3,
+          deltaX: 0,
+          deltaY: 0,
+          planarError: 0,
+        ),
+      ),
+      throwsUnsupportedError,
+    );
+  });
+
+  test('integrates multi-point localCad to UTM to WGS84 and KML', () {
+    final georeferenced = service.georeferenceLayerWithControlPoints(
+      sourceLayer: localPointLayer(
+        coordinate: const MapCoordinate(x: 0, y: 0, z: 30),
+      ),
+      controlPoints: [
+        controlPoint(
+          localX: 0,
+          localY: 0,
+          targetX: 500000,
+          targetY: 1768935.376,
+        ),
+        controlPoint(
+          localX: 10,
+          localY: 0,
+          targetX: 500010,
+          targetY: 1768935.376,
+        ),
+        controlPoint(
+          localX: 0,
+          localY: 10,
+          targetX: 500000,
+          targetY: 1768945.376,
+        ),
+      ],
+      targetCrs: const CoordinateReferenceSystem.utm(
+        utmZone: 48,
+        hemisphere: UtmHemisphere.north,
+      ),
+    );
+    final wgs84 = const LayerReprojectionService().reprojectLayer(
+      sourceLayer: georeferenced.layer,
+      targetCrs: const CoordinateReferenceSystem.wgs84(),
+    );
+
+    expect(georeferenced.controlPointCount, 3);
+    expect(wgs84.layer.features.single.coordinates.single.z, 30);
+    expect(
+      () => const KmlExportService().exportLayers(
+        documentName: 'Multi-point',
+        layers: [wgs84.layer],
+      ),
+      returnsNormally,
+    );
+  });
 }

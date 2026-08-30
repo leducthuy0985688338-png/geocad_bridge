@@ -8,85 +8,50 @@ import '../services/layer_georeference_service.dart';
 class LayerGeoreferenceDialog extends StatefulWidget {
   final MapLayer layer;
 
-  const LayerGeoreferenceDialog({
-    super.key,
-    required this.layer,
-  });
+  const LayerGeoreferenceDialog({super.key, required this.layer});
 
   @override
   State<LayerGeoreferenceDialog> createState() =>
       _LayerGeoreferenceDialogState();
 }
 
-class _LayerGeoreferenceDialogState
-    extends State<LayerGeoreferenceDialog> {
-  final LayerGeoreferenceService _service =
-      const LayerGeoreferenceService();
-
-  late final TextEditingController _local1X;
-  late final TextEditingController _local1Y;
-  late final TextEditingController _target1X;
-  late final TextEditingController _target1Y;
-
-  late final TextEditingController _local2X;
-  late final TextEditingController _local2Y;
-  late final TextEditingController _target2X;
-  late final TextEditingController _target2Y;
+class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
+  final LayerGeoreferenceService _service = const LayerGeoreferenceService();
+  final List<_ControlPointEntry> _entries = [];
 
   int _utmZone = 48;
   UtmHemisphere _hemisphere = UtmHemisphere.north;
-
-  GeoreferenceTransform? _preview;
+  GeoreferenceFitResult? _preview;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-
     final defaults = _defaultLocalPoints(widget.layer);
-
-    _local1X = TextEditingController(
-      text: _format(defaults.$1.x),
-    );
-    _local1Y = TextEditingController(
-      text: _format(defaults.$1.y),
-    );
-    _target1X = TextEditingController();
-
-    _target1Y = TextEditingController();
-
-    _local2X = TextEditingController(
-      text: _format(defaults.$2.x),
-    );
-    _local2Y = TextEditingController(
-      text: _format(defaults.$2.y),
-    );
-    _target2X = TextEditingController();
-    _target2Y = TextEditingController();
+    _entries.addAll([
+      _ControlPointEntry.fromLocal(defaults.$1, _format),
+      _ControlPointEntry.fromLocal(defaults.$2, _format),
+    ]);
   }
 
   @override
   void dispose() {
-    _local1X.dispose();
-    _local1Y.dispose();
-    _target1X.dispose();
-    _target1Y.dispose();
-    _local2X.dispose();
-    _local2Y.dispose();
-    _target2X.dispose();
-    _target2Y.dispose();
+    for (final entry in _entries) {
+      entry.dispose();
+    }
     super.dispose();
   }
 
-  (MapCoordinate, MapCoordinate) _defaultLocalPoints(
-    MapLayer layer,
-  ) {
+  CoordinateReferenceSystem get _targetCrs =>
+      CoordinateReferenceSystem.utm(utmZone: _utmZone, hemisphere: _hemisphere);
+
+  (MapCoordinate, MapCoordinate) _defaultLocalPoints(MapLayer layer) {
     final coordinates = layer.features
         .expand((feature) => feature.coordinates)
         .toList();
 
     if (coordinates.length >= 2) {
-      var first = coordinates.first;
+      final first = coordinates.first;
       var second = coordinates[1];
       var bestDistanceSquared = -1.0;
 
@@ -94,100 +59,86 @@ class _LayerGeoreferenceDialogState
         final dx = candidate.x - first.x;
         final dy = candidate.y - first.y;
         final distanceSquared = dx * dx + dy * dy;
-
         if (distanceSquared > bestDistanceSquared) {
           bestDistanceSquared = distanceSquared;
           second = candidate;
         }
       }
-
       return (first, second);
     }
 
     if (coordinates.length == 1) {
       final first = coordinates.first;
-      return (
-        first,
-        MapCoordinate(
-          x: first.x + 1,
-          y: first.y,
-          z: first.z,
-        ),
-      );
+      return (first, MapCoordinate(x: first.x + 1, y: first.y, z: first.z));
     }
 
-    return (
-      const MapCoordinate(x: 0, y: 0),
-      const MapCoordinate(x: 1, y: 0),
-    );
+    return (const MapCoordinate(x: 0, y: 0), const MapCoordinate(x: 1, y: 0));
   }
 
   String _format(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
     return value.toStringAsFixed(6);
   }
 
-  double _read(
-    TextEditingController controller,
-    String label,
-  ) {
-    final value = double.tryParse(
-      controller.text.trim().replaceAll(',', '.'),
-    );
-
+  double _read(TextEditingController controller, String label) {
+    final value = double.tryParse(controller.text.trim().replaceAll(',', '.'));
     if (value == null) {
-      throw ArgumentError(
-        '$label không phải là số hợp lệ.',
-      );
+      throw ArgumentError('$label không phải là số hợp lệ.');
     }
-
     return value;
   }
 
-  GeoreferenceControlPoint _readPoint1() {
-    return GeoreferenceControlPoint(
-      local: MapCoordinate(
-        x: _read(_local1X, 'CAD X1'),
-        y: _read(_local1Y, 'CAD Y1'),
-      ),
-      target: MapCoordinate(
-        x: _read(_target1X, 'UTM Easting 1'),
-        y: _read(_target1Y, 'UTM Northing 1'),
-      ),
-    );
-  }
-
-  GeoreferenceControlPoint _readPoint2() {
-    return GeoreferenceControlPoint(
-      local: MapCoordinate(
-        x: _read(_local2X, 'CAD X2'),
-        y: _read(_local2Y, 'CAD Y2'),
-      ),
-      target: MapCoordinate(
-        x: _read(_target2X, 'UTM Easting 2'),
-        y: _read(_target2Y, 'UTM Northing 2'),
-      ),
-    );
-  }
-
-  CoordinateReferenceSystem get _targetCrs =>
-      CoordinateReferenceSystem.utm(
-        utmZone: _utmZone,
-        hemisphere: _hemisphere,
+  List<GeoreferenceControlPoint> _readControlPoints() {
+    return List.generate(_entries.length, (index) {
+      final entry = _entries[index];
+      final number = index + 1;
+      return GeoreferenceControlPoint(
+        local: MapCoordinate(
+          x: _read(entry.localX, 'CAD X$number'),
+          y: _read(entry.localY, 'CAD Y$number'),
+        ),
+        target: MapCoordinate(
+          x: _read(entry.targetX, 'UTM Easting $number'),
+          y: _read(entry.targetY, 'UTM Northing $number'),
+        ),
       );
+    });
+  }
+
+  void _invalidatePreview() {
+    if (_preview == null && _errorMessage == null) return;
+    setState(() {
+      _preview = null;
+      _errorMessage = null;
+    });
+  }
+
+  void _addControlPoint() {
+    setState(() {
+      _entries.add(_ControlPointEntry.empty());
+      _preview = null;
+      _errorMessage = null;
+    });
+  }
+
+  void _removeControlPoint(int index) {
+    if (_entries.length <= 2) return;
+    final removed = _entries.removeAt(index);
+    removed.dispose();
+    setState(() {
+      _preview = null;
+      _errorMessage = null;
+    });
+  }
 
   void _calculatePreview() {
     try {
-      final transform = _service.calculateTransform(
-        point1: _readPoint1(),
-        point2: _readPoint2(),
+      final fit = _service.fitControlPoints(
+        controlPoints: _readControlPoints(),
+        targetCrs: _targetCrs,
       );
-
       setState(() {
-        _preview = transform;
+        _preview = fit;
         _errorMessage = null;
       });
     } catch (error) {
@@ -200,20 +151,10 @@ class _LayerGeoreferenceDialogState
 
   void _apply() {
     try {
-      final point1 = _readPoint1();
-      final point2 = _readPoint2();
-
-      _service.calculateTransform(
-        point1: point1,
-        point2: point2,
-      );
-
+      final points = _readControlPoints();
+      _service.fitControlPoints(controlPoints: points, targetCrs: _targetCrs);
       Navigator.of(context).pop(
-        LayerGeoreferenceRequest(
-          point1: point1,
-          point2: point2,
-          targetCrs: _targetCrs,
-        ),
+        LayerGeoreferenceRequest(controlPoints: points, targetCrs: _targetCrs),
       );
     } catch (error) {
       setState(() {
@@ -228,9 +169,8 @@ class _LayerGeoreferenceDialogState
       return error.message?.toString() ??
           'Dữ liệu điểm khống chế không hợp lệ.';
     }
-
-    return 'Không thể tính phép định vị. '
-        'Hãy kiểm tra lại các điểm khống chế.';
+    if (error is StateError) return error.message;
+    return 'Không thể tính phép định vị. Hãy kiểm tra lại các điểm khống chế.';
   }
 
   @override
@@ -240,10 +180,7 @@ class _LayerGeoreferenceDialogState
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 820,
-          maxHeight: 820,
-        ),
+        constraints: const BoxConstraints(maxWidth: 860, maxHeight: 860),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -260,8 +197,7 @@ class _LayerGeoreferenceDialogState
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'Định vị bản vẽ CAD',
@@ -275,18 +211,14 @@ class _LayerGeoreferenceDialogState
                           widget.layer.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                          ),
+                          style: const TextStyle(color: Colors.grey),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
                     tooltip: 'Đóng',
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
+                    onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -294,15 +226,14 @@ class _LayerGeoreferenceDialogState
               const SizedBox(height: 20),
               const Text(
                 'CRS đích',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<int>(
+                      key: const Key('georeference-zone'),
                       initialValue: _utmZone,
                       decoration: const InputDecoration(
                         labelText: 'UTM Zone',
@@ -317,18 +248,18 @@ class _LayerGeoreferenceDialogState
                       ),
                       onChanged: (value) {
                         if (value == null) return;
-
                         setState(() {
                           _utmZone = value;
                           _preview = null;
+                          _errorMessage = null;
                         });
                       },
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child:
-                        DropdownButtonFormField<UtmHemisphere>(
+                    child: DropdownButtonFormField<UtmHemisphere>(
+                      key: const Key('georeference-hemisphere'),
                       initialValue: _hemisphere,
                       decoration: const InputDecoration(
                         labelText: 'Bán cầu',
@@ -346,10 +277,10 @@ class _LayerGeoreferenceDialogState
                       ],
                       onChanged: (value) {
                         if (value == null) return;
-
                         setState(() {
                           _hemisphere = value;
                           _preview = null;
+                          _errorMessage = null;
                         });
                       },
                     ),
@@ -358,8 +289,7 @@ class _LayerGeoreferenceDialogState
               ),
               const SizedBox(height: 8),
               Text(
-                '${targetCrs.displayName} • '
-                'EPSG:${targetCrs.epsgCode}',
+                '${targetCrs.displayName} • EPSG:${targetCrs.epsgCode}',
                 style: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF1565C0),
@@ -367,118 +297,78 @@ class _LayerGeoreferenceDialogState
                 ),
               ),
               const SizedBox(height: 22),
-              _ControlPointEditor(
-                title: 'Điểm khống chế 1',
-                localX: _local1X,
-                localY: _local1Y,
-                targetX: _target1X,
-                targetY: _target1Y,
-              ),
-              const SizedBox(height: 16),
-              _ControlPointEditor(
-                title: 'Điểm khống chế 2',
-                localX: _local2X,
-                localY: _local2Y,
-                targetX: _target2X,
-                targetY: _target2Y,
+              ...List.generate(_entries.length, (index) {
+                final residual = _preview == null
+                    ? null
+                    : _preview!.residuals[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _ControlPointEditor(
+                    index: index,
+                    entry: _entries[index],
+                    residual: residual,
+                    canRemove: _entries.length > 2,
+                    onChanged: _invalidatePreview,
+                    onRemove: () => _removeControlPoint(index),
+                  ),
+                );
+              }),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: const Key('add-control-point'),
+                  onPressed: _addControlPoint,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Thêm điểm khống chế'),
+                ),
               ),
               const SizedBox(height: 18),
               OutlinedButton.icon(
+                key: const Key('calculate-georeference-preview'),
                 onPressed: _calculatePreview,
                 icon: const Icon(Icons.calculate_outlined),
-                label: const Text(
-                  'Tính thử phép định vị',
-                ),
+                label: const Text('Tính thử phép định vị'),
               ),
               if (_preview != null) ...[
                 const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFFA5D6A7),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Phép biến đổi 2 điểm',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2E7D32),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Scale: '
-                        '${_preview!.scale.toStringAsFixed(9)}',
-                      ),
-                      Text(
-                        'Rotation: '
-                        '${_preview!.rotationDegrees.toStringAsFixed(6)}°',
-                      ),
-                      Text(
-                        'Translation X: '
-                        '${_preview!.translationX.toStringAsFixed(3)}',
-                      ),
-                      Text(
-                        'Translation Y: '
-                        '${_preview!.translationY.toStringAsFixed(3)}',
-                      ),
-                    ],
-                  ),
-                ),
+                _FitSummary(fit: _preview!),
               ],
               if (_errorMessage != null) ...[
                 const SizedBox(height: 14),
                 Container(
+                  key: const Key('georeference-error'),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .errorContainer,
+                    color: Theme.of(context).colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     _errorMessage!,
                     style: TextStyle(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onErrorContainer,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
                     ),
                   ),
                 ),
               ],
               const SizedBox(height: 18),
               const Text(
-                'Hai điểm CAD phải là hai vị trí khác nhau '
-                'trên bản vẽ. Hai tọa độ UTM tương ứng phải là '
-                'tọa độ thực của đúng hai vị trí đó.',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey,
-                ),
+                'Nhập ít nhất hai điểm CAD và tọa độ UTM thực tương ứng. '
+                'Với nhiều hơn hai điểm, ứng dụng dùng bình sai least-squares.',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
               ),
               const SizedBox(height: 18),
               Row(
                 children: [
                   TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
+                    onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Hủy'),
                   ),
                   const Spacer(),
                   FilledButton.icon(
+                    key: const Key('apply-georeference'),
                     onPressed: _apply,
                     icon: const Icon(Icons.add_location_alt),
-                    label: const Text(
-                      'Tạo layer đã định vị',
-                    ),
+                    label: const Text('Tạo layer đã định vị'),
                   ),
                 ],
               ),
@@ -491,103 +381,208 @@ class _LayerGeoreferenceDialogState
 }
 
 class LayerGeoreferenceRequest {
-  final GeoreferenceControlPoint point1;
-  final GeoreferenceControlPoint point2;
+  final List<GeoreferenceControlPoint> controlPoints;
   final CoordinateReferenceSystem targetCrs;
 
-  const LayerGeoreferenceRequest({
-    required this.point1,
-    required this.point2,
+  LayerGeoreferenceRequest({
+    required List<GeoreferenceControlPoint> controlPoints,
     required this.targetCrs,
-  });
+  }) : controlPoints = List<GeoreferenceControlPoint>.unmodifiable(
+         controlPoints,
+       );
+
+  GeoreferenceControlPoint get point1 => controlPoints[0];
+  GeoreferenceControlPoint get point2 => controlPoints[1];
 }
 
-class _ControlPointEditor extends StatelessWidget {
-  final String title;
+class _ControlPointEntry {
   final TextEditingController localX;
   final TextEditingController localY;
   final TextEditingController targetX;
   final TextEditingController targetY;
 
-  const _ControlPointEditor({
-    required this.title,
+  _ControlPointEntry({
     required this.localX,
     required this.localY,
     required this.targetX,
     required this.targetY,
   });
 
+  factory _ControlPointEntry.fromLocal(
+    MapCoordinate coordinate,
+    String Function(double) formatter,
+  ) {
+    return _ControlPointEntry(
+      localX: TextEditingController(text: formatter(coordinate.x)),
+      localY: TextEditingController(text: formatter(coordinate.y)),
+      targetX: TextEditingController(),
+      targetY: TextEditingController(),
+    );
+  }
+
+  factory _ControlPointEntry.empty() {
+    return _ControlPointEntry(
+      localX: TextEditingController(),
+      localY: TextEditingController(),
+      targetX: TextEditingController(),
+      targetY: TextEditingController(),
+    );
+  }
+
+  void dispose() {
+    localX.dispose();
+    localY.dispose();
+    targetX.dispose();
+    targetY.dispose();
+  }
+}
+
+class _ControlPointEditor extends StatelessWidget {
+  final int index;
+  final _ControlPointEntry entry;
+  final GeoreferenceResidual? residual;
+  final bool canRemove;
+  final VoidCallback onChanged;
+  final VoidCallback onRemove;
+
+  const _ControlPointEditor({
+    required this.index,
+    required this.entry,
+    required this.residual,
+    required this.canRemove,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
   @override
   Widget build(BuildContext context) {
+    final number = index + 1;
     return Container(
+      key: Key('control-point-$index'),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F9FB),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFFDDE3E8),
-        ),
+        border: Border.all(color: const Color(0xFFDDE3E8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Điểm khống chế $number',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              if (canRemove)
+                IconButton(
+                  key: Key('remove-control-point-$index'),
+                  tooltip: 'Xóa điểm $number',
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _NumberField(
+                  fieldKey: Key('local-x-$index'),
+                  controller: entry.localX,
+                  label: 'CAD X',
+                  onChanged: onChanged,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _NumberField(
+                  fieldKey: Key('local-y-$index'),
+                  controller: entry.localY,
+                  label: 'CAD Y',
+                  onChanged: onChanged,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _NumberField(
+                  fieldKey: Key('target-x-$index'),
+                  controller: entry.targetX,
+                  label: 'UTM Easting',
+                  onChanged: onChanged,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _NumberField(
+                  fieldKey: Key('target-y-$index'),
+                  controller: entry.targetY,
+                  label: 'UTM Northing',
+                  onChanged: onChanged,
+                ),
+              ),
+            ],
+          ),
+          if (residual != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'ΔX: ${residual!.deltaX.toStringAsFixed(4)} m • '
+              'ΔY: ${residual!.deltaY.toStringAsFixed(4)} m • '
+              'Sai số: ${residual!.planarError.toStringAsFixed(4)} m',
+              key: Key('residual-$index'),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF455A64)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FitSummary extends StatelessWidget {
+  final GeoreferenceFitResult fit;
+
+  const _FitSummary({required this.fit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('georeference-fit-summary'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFA5D6A7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            title,
+            fit.controlPointCount == 2
+                ? 'Phép biến đổi 2 điểm'
+                : 'Bình sai ${fit.controlPointCount} điểm',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
+              color: Color(0xFF2E7D32),
             ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Tọa độ CAD cục bộ',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.black54,
-            ),
+          const SizedBox(height: 8),
+          Text('Scale: ${fit.transform.scale.toStringAsFixed(9)}'),
+          Text(
+            'Rotation: ${fit.transform.rotationDegrees.toStringAsFixed(6)}°',
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: _NumberField(
-                  controller: localX,
-                  label: 'CAD X',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _NumberField(
-                  controller: localY,
-                  label: 'CAD Y',
-                ),
-              ),
-            ],
+          Text(
+            'Translation X: ${fit.transform.translationX.toStringAsFixed(3)}',
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Tọa độ UTM thực tương ứng',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.black54,
-            ),
+          Text(
+            'Translation Y: ${fit.transform.translationY.toStringAsFixed(3)}',
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: _NumberField(
-                  controller: targetX,
-                  label: 'Easting',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _NumberField(
-                  controller: targetY,
-                  label: 'Northing',
-                ),
-              ),
-            ],
+          Text('RMSE: ${fit.rmse.toStringAsFixed(4)} m'),
+          Text(
+            'Sai số lớn nhất: ${fit.maxResidual.planarError.toStringAsFixed(4)} m '
+            '(điểm ${fit.maxResidualIndex + 1})',
           ),
         ],
       ),
@@ -596,20 +591,24 @@ class _ControlPointEditor extends StatelessWidget {
 }
 
 class _NumberField extends StatelessWidget {
+  final Key fieldKey;
   final TextEditingController controller;
   final String label;
+  final VoidCallback onChanged;
 
   const _NumberField({
+    required this.fieldKey,
     required this.controller,
     required this.label,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      key: fieldKey,
       controller: controller,
-      keyboardType:
-          const TextInputType.numberWithOptions(
+      keyboardType: const TextInputType.numberWithOptions(
         decimal: true,
         signed: true,
       ),
@@ -618,6 +617,7 @@ class _NumberField extends StatelessWidget {
         border: const OutlineInputBorder(),
         isDense: true,
       ),
+      onChanged: (_) => onChanged(),
     );
   }
 }

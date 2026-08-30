@@ -522,14 +522,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      final result = _layerGeoreferenceService.georeferenceLayer(
-        sourceLayer: sourceLayer,
-        point1: request.point1,
-        point2: request.point2,
-        targetCrs: request.targetCrs,
-        newLayerId: _createLayerId(),
-        newLayerName: '${sourceLayer.name} - Georeferenced',
-      );
+      final result = _layerGeoreferenceService
+          .georeferenceLayerWithControlPoints(
+            sourceLayer: sourceLayer,
+            controlPoints: request.controlPoints,
+            targetCrs: request.targetCrs,
+            newLayerId: _createLayerId(),
+            newLayerName: '${sourceLayer.name} - Georeferenced',
+          );
 
       _recordHistory();
 
@@ -540,7 +540,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _showMessage(
         'Đã định vị "${sourceLayer.name}": '
         '${result.transformedCoordinateCount} tọa độ • '
-        '${request.targetCrs.displayName}.',
+        '${request.targetCrs.displayName} • '
+        'RMSE ${result.rmse.toStringAsFixed(4)} m.',
       );
     } catch (error) {
       _showMessage('Không thể định vị layer: $error');
@@ -1482,7 +1483,7 @@ class _LayerCard extends StatelessWidget {
                 icon: const Icon(Icons.keyboard_arrow_down),
               ),
               IconButton(
-                tooltip: 'Định vị layer bằng 2 điểm khống chế',
+                tooltip: 'Định vị layer bằng các điểm khống chế',
                 onPressed:
                     layer.isCad &&
                         layer.crs.isLocalCad &&
