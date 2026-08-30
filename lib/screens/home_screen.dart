@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +14,7 @@ import '../services/cad_file_service.dart';
 import '../services/dxf_parser_service.dart';
 import '../services/project_history_service.dart';
 import '../services/project_persistence_service.dart';
+import '../services/project_dirty_state_service.dart';
 import '../services/layer_reprojection_service.dart';
 import '../services/layer_georeference_service.dart';
 import '../services/kml_parser_service.dart';
@@ -20,9 +22,19 @@ import '../services/kml_export_service.dart';
 import '../widgets/coordinate_converter_dialog.dart';
 import '../widgets/layer_georeference_dialog.dart';
 import '../widgets/map_canvas.dart';
+import '../widgets/unsaved_changes_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final MapProject? initialProject;
+  final Future<bool> Function(MapProject project)? saveProjectOverride;
+  final Future<GeoCadProjectDocument?> Function()? openProjectOverride;
+
+  const HomeScreen({
+    super.key,
+    this.initialProject,
+    this.saveProjectOverride,
+    this.openProjectOverride,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -42,26 +54,55 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final ProjectHistoryService _history = ProjectHistoryService(maxHistory: 100);
 
-  MapProject _project = const MapProject(
-    id: 'main-project',
-    name: 'Dự án AutoCAD ↔ Google Earth',
-  );
+  late MapProject _project;
+  late ProjectDirtyStateService _dirtyState;
+  late final AppLifecycleListener _lifecycleListener;
 
   bool _isImporting = false;
   bool _isExporting = false;
   bool _isProjectBusy = false;
   String? _projectPath;
   DateTime _projectCreatedAt = DateTime.now().toUtc();
+  bool _exitRequestActive = false;
+  bool _confirmationActive = false;
 
-  void _newProject() {
-    if (_isProjectBusy) return;
+  bool get _isDirty => _dirtyState.isDirty(_project);
+  bool get _hasBlockingProjectOperation =>
+      _isProjectBusy || _isImporting || _isExporting;
+
+  @override
+  void initState() {
+    super.initState();
+    _project =
+        widget.initialProject ??
+        const MapProject(
+          id: 'main-project',
+          name: 'Dự án AutoCAD ↔ Google Earth',
+        );
+    _dirtyState = ProjectDirtyStateService(_project);
+    _lifecycleListener = AppLifecycleListener(
+      onExitRequested: _handleExitRequested,
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
+  }
+
+  Future<void> _newProject() async {
+    if (_hasBlockingProjectOperation) return;
+    if (!await _prepareForDestructiveAction() || !mounted) return;
     final now = DateTime.now().toUtc();
+    final newProject = MapProject(
+      id: 'project-${now.microsecondsSinceEpoch}',
+      name: 'Dự án GeoCAD mới',
+    );
     _history.clear();
     setState(() {
-      _project = MapProject(
-        id: 'project-${now.microsecondsSinceEpoch}',
-        name: 'Dự án GeoCAD mới',
-      );
+      _project = newProject;
+      _dirtyState.markSaved(newProject);
       _projectPath = null;
       _projectCreatedAt = now;
     });
@@ -69,7 +110,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openProject() async {
-    if (_isProjectBusy) return;
+    if (_hasBlockingProjectOperation) return;
+    if (!await _prepareForDestructiveAction() || !mounted) return;
+    final override = widget.openProjectOverride;
+    if (override != null) {
+      setState(() => _isProjectBusy = true);
+      try {
+        final loaded = await override();
+        if (loaded == null || !mounted) return;
+        _applyLoadedProject(loaded, path: null);
+      } catch (error) {
+        _showMessage('Không thể mở project: $error');
+      } finally {
+        if (mounted) setState(() => _isProjectBusy = false);
+      }
+      return;
+    }
     final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['geocad'],
@@ -86,12 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final loaded = await _projectPersistenceService.load(path);
       if (!mounted) return;
-      _history.clear();
-      setState(() {
-        _project = loaded.project;
-        _projectPath = path;
-        _projectCreatedAt = loaded.createdAt;
-      });
+      _applyLoadedProject(loaded, path: path);
       if (loaded.warnings.isEmpty) {
         _showMessage('Đã mở project "${loaded.project.name}".');
       } else {
@@ -104,18 +155,48 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _saveProject() async {
-    if (_isProjectBusy) return;
-    final path = _projectPath;
-    if (path == null) {
-      await _saveProjectAs();
-      return;
-    }
-    await _saveProjectTo(path, updateCurrentPath: false);
+  void _applyLoadedProject(
+    GeoCadProjectDocument loaded, {
+    required String? path,
+  }) {
+    _history.clear();
+    setState(() {
+      _project = loaded.project;
+      _dirtyState.markSaved(loaded.project);
+      _projectPath = path;
+      _projectCreatedAt = loaded.createdAt;
+    });
   }
 
-  Future<void> _saveProjectAs() async {
-    if (_isProjectBusy) return;
+  Future<bool> _saveProject() async {
+    if (_hasBlockingProjectOperation) return false;
+    final override = widget.saveProjectOverride;
+    if (override != null) {
+      final projectBeingSaved = _project;
+      setState(() => _isProjectBusy = true);
+      try {
+        final saved = await override(projectBeingSaved);
+        if (!saved || !mounted) return false;
+        setState(() => _dirtyState.markSaved(projectBeingSaved));
+        return true;
+      } catch (error) {
+        _showMessage('Không thể lưu project: $error');
+        return false;
+      } finally {
+        if (mounted) setState(() => _isProjectBusy = false);
+      }
+    }
+    final path = _projectPath;
+    if (path == null) {
+      return _saveProjectAs();
+    }
+    return _saveProjectTo(path, updateCurrentPath: false);
+  }
+
+  Future<bool> _saveProjectAs() async {
+    if (_hasBlockingProjectOperation) return false;
+    final override = widget.saveProjectOverride;
+    if (override != null) return _saveProject();
     final uri = await FilePicker.saveFile(
       dialogTitle: 'Lưu GeoCAD Project',
       fileName: '${_safeFileName(_project.name)}.geocad',
@@ -123,31 +204,73 @@ class _HomeScreenState extends State<HomeScreen> {
       allowedExtensions: const ['geocad'],
       bytes: Uint8List(0),
     );
-    if (uri == null || !mounted) return;
-    await _saveProjectTo(uri.toFilePath(), updateCurrentPath: true);
+    if (uri == null || !mounted) return false;
+    return _saveProjectTo(uri.toFilePath(), updateCurrentPath: true);
   }
 
-  Future<void> _saveProjectTo(
+  Future<bool> _saveProjectTo(
     String path, {
     required bool updateCurrentPath,
   }) async {
+    final projectBeingSaved = _project;
     setState(() => _isProjectBusy = true);
     try {
       final document = GeoCadProjectDocument(
-        project: _project,
+        project: projectBeingSaved,
         createdAt: _projectCreatedAt,
         updatedAt: DateTime.now().toUtc(),
       );
       await _projectPersistenceService.save(path, document);
-      if (!mounted) return;
-      if (updateCurrentPath) {
-        setState(() => _projectPath = path);
-      }
+      if (!mounted) return false;
+      setState(() {
+        if (updateCurrentPath) _projectPath = path;
+        _dirtyState.markSaved(projectBeingSaved);
+      });
       _showMessage('Đã lưu project: $path');
+      return true;
     } catch (error) {
       _showMessage('Không thể lưu project: $error');
+      return false;
     } finally {
       if (mounted) setState(() => _isProjectBusy = false);
+    }
+  }
+
+  Future<bool> _prepareForDestructiveAction() async {
+    if (!_isDirty) return true;
+    if (_confirmationActive) return false;
+    _confirmationActive = true;
+    try {
+      final decision = await showDialog<UnsavedChangesDecision>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const UnsavedChangesDialog(),
+      );
+      if (!mounted) return false;
+      return switch (decision) {
+        UnsavedChangesDecision.discard => true,
+        UnsavedChangesDecision.save => await _saveProject(),
+        UnsavedChangesDecision.cancel || null => false,
+      };
+    } finally {
+      _confirmationActive = false;
+    }
+  }
+
+  Future<AppExitResponse> _handleExitRequested() async {
+    if (_hasBlockingProjectOperation ||
+        _exitRequestActive ||
+        _confirmationActive) {
+      return AppExitResponse.cancel;
+    }
+    if (!_isDirty) return AppExitResponse.exit;
+    _exitRequestActive = true;
+    try {
+      return await _prepareForDestructiveAction()
+          ? AppExitResponse.exit
+          : AppExitResponse.cancel;
+    } finally {
+      _exitRequestActive = false;
     }
   }
 
@@ -188,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openCadFiles() async {
-    if (_isImporting) return;
+    if (_isImporting || _isProjectBusy) return;
 
     final documents = await _cadFileService.pickCadFiles();
 
@@ -246,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openGoogleEarthFiles() async {
-    if (_isImporting) return;
+    if (_isImporting || _isProjectBusy) return;
 
     final files = await FilePicker.pickFiles(
       type: FileType.custom,
@@ -474,6 +597,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _undo() {
+    if (_isProjectBusy) return;
     final previous = _history.undo(_project);
 
     if (previous == null) return;
@@ -484,6 +608,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _redo() {
+    if (_isProjectBusy) return;
     final next = _history.redo(_project);
 
     if (next == null) return;
@@ -494,6 +619,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _applyFeatureChange(MapFeatureChange change) {
+    if (_isProjectBusy) return;
     MapLayer? ownerLayer;
 
     for (final layer in _project.layers) {
@@ -537,6 +663,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _removeLayer(String layerId) {
+    if (_isProjectBusy) return;
     _recordHistory();
 
     setState(() {
@@ -545,6 +672,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _toggleLayerVisibility(MapLayer layer) {
+    if (_isProjectBusy) return;
     _recordHistory();
 
     setState(() {
@@ -553,6 +681,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _toggleLayerLock(MapLayer layer) {
+    if (_isProjectBusy) return;
     _recordHistory();
 
     setState(() {
@@ -561,6 +690,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _moveLayerUp(String layerId) {
+    if (_isProjectBusy) return;
     final index = _project.layers.indexWhere((layer) => layer.id == layerId);
 
     if (index <= 0) return;
@@ -573,6 +703,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _moveLayerDown(String layerId) {
+    if (_isProjectBusy) return;
     final index = _project.layers.indexWhere((layer) => layer.id == layerId);
 
     if (index < 0 || index >= _project.layers.length - 1) {
@@ -643,6 +774,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _georeferenceLayer(MapLayer sourceLayer) async {
+    if (_isProjectBusy) return;
     if (!sourceLayer.isCad ||
         !sourceLayer.crs.isLocalCad ||
         sourceLayer.features.isEmpty) {
@@ -689,6 +821,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _createWgs84Layer(MapLayer sourceLayer) {
+    if (_isProjectBusy) return;
     if (!sourceLayer.canTransformToWgs84) {
       _showMessage(
         'Layer "${sourceLayer.name}" chưa có CRS hợp lệ. '
@@ -907,6 +1040,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _updateLayerCrs(MapLayer layer, CoordinateReferenceSystem crs) {
+    if (_isProjectBusy) return;
     if (layer.crs.type == crs.type &&
         layer.crs.utmZone == crs.utmZone &&
         layer.crs.hemisphere == crs.hemisphere) {
@@ -950,29 +1084,32 @@ class _HomeScreenState extends State<HomeScreen> {
             appBar: AppBar(
               backgroundColor: const Color(0xFF1565C0),
               foregroundColor: Colors.white,
-              title: const Text(
-                'AutoCAD ↔ Google Earth',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              title: Text(
+                'AutoCAD ↔ Google Earth — ${_project.name}${_isDirty ? ' *' : ''}',
+                key: const Key('project-title'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
                 IconButton(
                   tooltip: 'Project mới',
-                  onPressed: _isProjectBusy ? null : _newProject,
+                  onPressed: _hasBlockingProjectOperation ? null : _newProject,
                   icon: const Icon(Icons.note_add_outlined),
                 ),
                 IconButton(
                   tooltip: 'Mở project',
-                  onPressed: _isProjectBusy ? null : _openProject,
+                  onPressed: _hasBlockingProjectOperation ? null : _openProject,
                   icon: const Icon(Icons.folder_open),
                 ),
                 IconButton(
                   tooltip: 'Lưu project',
-                  onPressed: _isProjectBusy ? null : _saveProject,
+                  onPressed: _hasBlockingProjectOperation ? null : _saveProject,
                   icon: const Icon(Icons.save_outlined),
                 ),
                 IconButton(
                   tooltip: 'Lưu project thành...',
-                  onPressed: _isProjectBusy ? null : _saveProjectAs,
+                  onPressed: _hasBlockingProjectOperation
+                      ? null
+                      : _saveProjectAs,
                   icon: const Icon(Icons.save_as_outlined),
                 ),
                 const VerticalDivider(
@@ -983,48 +1120,51 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 IconButton(
                   tooltip: 'Undo (Ctrl+Z)',
-                  onPressed: _history.canUndo ? _undo : null,
+                  onPressed: !_isProjectBusy && _history.canUndo ? _undo : null,
                   icon: const Icon(Icons.undo),
                 ),
                 IconButton(
                   tooltip: 'Redo (Ctrl+Y)',
-                  onPressed: _history.canRedo ? _redo : null,
+                  onPressed: !_isProjectBusy && _history.canRedo ? _redo : null,
                   icon: const Icon(Icons.redo),
                 ),
                 const SizedBox(width: 8),
               ],
             ),
-            body: Row(
-              children: [
-                SizedBox(
-                  width: 340,
-                  child: _LeftPanel(
-                    project: _project,
-                    isImporting: _isImporting,
-                    isExporting: _isExporting,
-                    onOpenCadFiles: _openCadFiles,
-                    onOpenGoogleEarthFiles: _openGoogleEarthFiles,
-                    onOpenCoordinateConverter: _openCoordinateConverter,
-                    onExportKml: _exportKml,
-                    onUpdateLayerCrs: _updateLayerCrs,
-                    onCreateWgs84Layer: _createWgs84Layer,
-                    onGeoreferenceLayer: _georeferenceLayer,
-                    onToggleVisibility: _toggleLayerVisibility,
-                    onToggleLock: _toggleLayerLock,
-                    onRemoveLayer: _removeLayer,
-                    onMoveLayerUp: _moveLayerUp,
-                    onMoveLayerDown: _moveLayerDown,
+            body: AbsorbPointer(
+              absorbing: _isProjectBusy,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 340,
+                    child: _LeftPanel(
+                      project: _project,
+                      isImporting: _isImporting,
+                      isExporting: _isExporting,
+                      onOpenCadFiles: _openCadFiles,
+                      onOpenGoogleEarthFiles: _openGoogleEarthFiles,
+                      onOpenCoordinateConverter: _openCoordinateConverter,
+                      onExportKml: _exportKml,
+                      onUpdateLayerCrs: _updateLayerCrs,
+                      onCreateWgs84Layer: _createWgs84Layer,
+                      onGeoreferenceLayer: _georeferenceLayer,
+                      onToggleVisibility: _toggleLayerVisibility,
+                      onToggleLock: _toggleLayerLock,
+                      onRemoveLayer: _removeLayer,
+                      onMoveLayerUp: _moveLayerUp,
+                      onMoveLayerDown: _moveLayerDown,
+                    ),
                   ),
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(
-                  child: _Workspace(
-                    project: _project,
-                    isImporting: _isImporting,
-                    onFeatureChanged: _applyFeatureChange,
+                  const VerticalDivider(width: 1),
+                  Expanded(
+                    child: _Workspace(
+                      project: _project,
+                      isImporting: _isImporting,
+                      onFeatureChanged: _applyFeatureChange,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
