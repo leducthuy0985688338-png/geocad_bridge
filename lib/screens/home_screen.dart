@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
@@ -13,6 +15,7 @@ import '../services/project_history_service.dart';
 import '../services/layer_reprojection_service.dart';
 import '../services/layer_georeference_service.dart';
 import '../services/kml_parser_service.dart';
+import '../services/kml_export_service.dart';
 import '../widgets/coordinate_converter_dialog.dart';
 import '../widgets/layer_georeference_dialog.dart';
 import '../widgets/map_canvas.dart';
@@ -31,11 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
       const LayerReprojectionService();
   final LayerGeoreferenceService _layerGeoreferenceService =
       const LayerGeoreferenceService();
-  final KmlParserService _kmlParserService =
-      const KmlParserService();
+  final KmlParserService _kmlParserService = const KmlParserService();
+  final KmlExportService _kmlExportService = const KmlExportService();
 
-  final ProjectHistoryService _history =
-      ProjectHistoryService(maxHistory: 100);
+  final ProjectHistoryService _history = ProjectHistoryService(maxHistory: 100);
 
   MapProject _project = const MapProject(
     id: 'main-project',
@@ -43,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   bool _isImporting = false;
+  bool _isExporting = false;
 
   Future<void> _openCadFiles() async {
     if (_isImporting) return;
@@ -83,23 +86,16 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       if (newLayers.isEmpty && errors.isEmpty) {
-        _showMessage(
-          'Các file đã chọn đều đang có trong dự án.',
-        );
+        _showMessage('Các file đã chọn đều đang có trong dự án.');
         return;
       }
 
       if (errors.isEmpty) {
-        _showMessage(
-          'Đã thêm ${newLayers.length} bản vẽ vào dự án.',
-        );
+        _showMessage('Đã thêm ${newLayers.length} bản vẽ vào dự án.');
         return;
       }
 
-      _showImportResult(
-        importedCount: newLayers.length,
-        errors: errors,
-      );
+      _showImportResult(importedCount: newLayers.length, errors: errors);
     } finally {
       if (mounted) {
         setState(() {
@@ -135,9 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final path = file.path;
 
         if (path == null || path.trim().isEmpty) {
-          errors.add(
-            '${file.name}: Không lấy được đường dẫn file.',
-          );
+          errors.add('${file.name}: Không lấy được đường dẫn file.');
           continue;
         }
 
@@ -147,8 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         try {
-          final parsed =
-              await _kmlParserService.parseFile(path);
+          final parsed = await _kmlParserService.parseFile(path);
 
           if (parsed.features.isEmpty) {
             errors.add(
@@ -164,21 +157,15 @@ class _HomeScreenState extends State<HomeScreen> {
               name: file.name,
               sourcePath: path,
               sourceType: MapLayerSourceType.kml,
-              crs:
-                  const CoordinateReferenceSystem.wgs84(),
+              crs: const CoordinateReferenceSystem.wgs84(),
               features: parsed.features,
               properties: {
-                'placemarkCount':
-                    parsed.placemarkCount.toString(),
-                'pointCount':
-                    parsed.pointCount.toString(),
-                'lineStringCount':
-                    parsed.lineStringCount.toString(),
-                'polygonCount':
-                    parsed.polygonCount.toString(),
+                'placemarkCount': parsed.placemarkCount.toString(),
+                'pointCount': parsed.pointCount.toString(),
+                'lineStringCount': parsed.lineStringCount.toString(),
+                'polygonCount': parsed.polygonCount.toString(),
                 'sourceFormat': 'KML',
-                'coordinateOrder':
-                    'longitude,latitude,altitude',
+                'coordinateOrder': 'longitude,latitude,altitude',
                 'epsg': '4326',
               },
             ),
@@ -198,12 +185,8 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
 
-      if (newLayers.isEmpty &&
-          errors.isEmpty &&
-          skippedCount > 0) {
-        _showMessage(
-          'Các file KML đã chọn đều đang có trong dự án.',
-        );
+      if (newLayers.isEmpty && errors.isEmpty && skippedCount > 0) {
+        _showMessage('Các file KML đã chọn đều đang có trong dự án.');
         return;
       }
 
@@ -244,15 +227,12 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
-            'Kết quả nhập Google Earth',
-          ),
+          title: const Text('Kết quả nhập Google Earth'),
           content: SizedBox(
             width: 560,
             child: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
@@ -269,16 +249,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   const Text(
                     'Các file không đọc được:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   ...errors.map(
                     (error) => Padding(
-                      padding: const EdgeInsets.only(
-                        bottom: 6,
-                      ),
+                      padding: const EdgeInsets.only(bottom: 6),
                       child: Text('• $error'),
                     ),
                   ),
@@ -300,14 +276,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool _projectContainsPath(String path) {
-    return _project.layers.any(
-      (layer) => layer.sourcePath == path,
-    );
+    return _project.layers.any((layer) => layer.sourcePath == path);
   }
 
-  Future<MapLayer> _createCadLayer(
-    CadDocument document,
-  ) async {
+  Future<MapLayer> _createCadLayer(CadDocument document) async {
     switch (document.fileType) {
       case CadFileType.dxf:
         return _createDxfLayer(document);
@@ -318,9 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
           name: document.name,
           sourcePath: document.path,
           sourceType: MapLayerSourceType.dwg,
-          properties: const {
-            'geometryStatus': 'Chưa hỗ trợ đọc hình học DWG',
-          },
+          properties: const {'geometryStatus': 'Chưa hỗ trợ đọc hình học DWG'},
         );
 
       case CadFileType.unknown:
@@ -333,12 +303,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<MapLayer> _createDxfLayer(
-    CadDocument document,
-  ) async {
-    final result = await _dxfParserService.parseFile(
-      document.path,
-    );
+  Future<MapLayer> _createDxfLayer(CadDocument document) async {
+    final result = await _dxfParserService.parseFile(document.path);
 
     return MapLayer(
       id: _createLayerId(),
@@ -387,17 +353,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _applyFeatureChange(
-    MapFeatureChange change,
-  ) {
+  void _applyFeatureChange(MapFeatureChange change) {
     MapLayer? ownerLayer;
 
     for (final layer in _project.layers) {
       for (final feature in layer.features) {
-        if (identical(
-          feature,
-          change.originalFeature,
-        )) {
+        if (identical(feature, change.originalFeature)) {
           ownerLayer = layer;
           break;
         }
@@ -407,24 +368,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (ownerLayer == null) {
-      _showMessage(
-        'Không tìm thấy layer chứa đối tượng.',
-      );
+      _showMessage('Không tìm thấy layer chứa đối tượng.');
       return;
     }
 
     if (ownerLayer.locked) {
-      _showMessage(
-        'Layer "${ownerLayer.name}" đang bị khóa.',
-      );
+      _showMessage('Layer "${ownerLayer.name}" đang bị khóa.');
       return;
     }
 
     final index = ownerLayer.features.indexWhere(
-      (feature) => identical(
-        feature,
-        change.originalFeature,
-      ),
+      (feature) => identical(feature, change.originalFeature),
     );
 
     if (index < 0) return;
@@ -433,16 +387,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     features[index] = change.updatedFeature;
 
-    final updatedLayer = ownerLayer.copyWith(
-      features: features,
-    );
+    final updatedLayer = ownerLayer.copyWith(features: features);
 
     _recordHistory();
 
     setState(() {
-      _project = _project.updateLayer(
-        updatedLayer,
-      );
+      _project = _project.updateLayer(updatedLayer);
     });
   }
 
@@ -454,38 +404,24 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _toggleLayerVisibility(
-    MapLayer layer,
-  ) {
+  void _toggleLayerVisibility(MapLayer layer) {
     _recordHistory();
 
     setState(() {
-      _project = _project.updateLayer(
-        layer.copyWith(
-          visible: !layer.visible,
-        ),
-      );
+      _project = _project.updateLayer(layer.copyWith(visible: !layer.visible));
     });
   }
 
-  void _toggleLayerLock(
-    MapLayer layer,
-  ) {
+  void _toggleLayerLock(MapLayer layer) {
     _recordHistory();
 
     setState(() {
-      _project = _project.updateLayer(
-        layer.copyWith(
-          locked: !layer.locked,
-        ),
-      );
+      _project = _project.updateLayer(layer.copyWith(locked: !layer.locked));
     });
   }
 
   void _moveLayerUp(String layerId) {
-    final index = _project.layers.indexWhere(
-      (layer) => layer.id == layerId,
-    );
+    final index = _project.layers.indexWhere((layer) => layer.id == layerId);
 
     if (index <= 0) return;
 
@@ -497,12 +433,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _moveLayerDown(String layerId) {
-    final index = _project.layers.indexWhere(
-      (layer) => layer.id == layerId,
-    );
+    final index = _project.layers.indexWhere((layer) => layer.id == layerId);
 
-    if (index < 0 ||
-        index >= _project.layers.length - 1) {
+    if (index < 0 || index >= _project.layers.length - 1) {
       return;
     }
 
@@ -518,11 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showImportResult({
@@ -535,9 +464,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text(
-            'Kết quả nhập bản vẽ',
-          ),
+          title: const Text('Kết quả nhập bản vẽ'),
           content: SizedBox(
             width: 520,
             child: SingleChildScrollView(
@@ -545,22 +472,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Đã thêm thành công: $importedCount file',
-                  ),
+                  Text('Đã thêm thành công: $importedCount file'),
                   const SizedBox(height: 16),
                   const Text(
                     'Các file không đọc được:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   ...errors.map(
                     (error) => Padding(
-                      padding: const EdgeInsets.only(
-                        bottom: 6,
-                      ),
+                      padding: const EdgeInsets.only(bottom: 6),
                       child: Text('• $error'),
                     ),
                   ),
@@ -581,16 +502,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _georeferenceLayer(
-    MapLayer sourceLayer,
-  ) async {
-    final request =
-        await showDialog<LayerGeoreferenceRequest>(
+  Future<void> _georeferenceLayer(MapLayer sourceLayer) async {
+    final request = await showDialog<LayerGeoreferenceRequest>(
       context: context,
       builder: (context) {
-        return LayerGeoreferenceDialog(
-          layer: sourceLayer,
-        );
+        return LayerGeoreferenceDialog(layer: sourceLayer);
       },
     );
 
@@ -599,15 +515,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      final result =
-          _layerGeoreferenceService.georeferenceLayer(
+      final result = _layerGeoreferenceService.georeferenceLayer(
         sourceLayer: sourceLayer,
         point1: request.point1,
         point2: request.point2,
         targetCrs: request.targetCrs,
         newLayerId: _createLayerId(),
-        newLayerName:
-            '${sourceLayer.name} - Georeferenced',
+        newLayerName: '${sourceLayer.name} - Georeferenced',
       );
 
       _recordHistory();
@@ -622,15 +536,11 @@ class _HomeScreenState extends State<HomeScreen> {
         '${request.targetCrs.displayName}.',
       );
     } catch (error) {
-      _showMessage(
-        'Không thể định vị layer: $error',
-      );
+      _showMessage('Không thể định vị layer: $error');
     }
   }
 
-  void _createWgs84Layer(
-    MapLayer sourceLayer,
-  ) {
+  void _createWgs84Layer(MapLayer sourceLayer) {
     if (!sourceLayer.canTransformToWgs84) {
       _showMessage(
         'Layer "${sourceLayer.name}" chưa có CRS hợp lệ. '
@@ -640,18 +550,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (sourceLayer.crs.isWgs84) {
-      _showMessage(
-        'Layer "${sourceLayer.name}" đã là WGS84 (EPSG:4326).',
-      );
+      _showMessage('Layer "${sourceLayer.name}" đã là WGS84 (EPSG:4326).');
       return;
     }
 
     try {
-      final result =
-          _layerReprojectionService.reprojectLayer(
+      final result = _layerReprojectionService.reprojectLayer(
         sourceLayer: sourceLayer,
-        targetCrs:
-            const CoordinateReferenceSystem.wgs84(),
+        targetCrs: const CoordinateReferenceSystem.wgs84(),
         newLayerId: _createLayerId(),
         newLayerName: '${sourceLayer.name} - WGS84',
       );
@@ -668,9 +574,7 @@ class _HomeScreenState extends State<HomeScreen> {
         '${result.transformedCoordinateCount} tọa độ.',
       );
     } catch (error) {
-      _showMessage(
-        'Không thể tạo layer WGS84: $error',
-      );
+      _showMessage('Không thể tạo layer WGS84: $error');
     }
   }
 
@@ -683,10 +587,178 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _updateLayerCrs(
-    MapLayer layer,
-    CoordinateReferenceSystem crs,
-  ) {
+  Future<void> _exportKml() async {
+    if (_isExporting || _isImporting) return;
+
+    final exportLayers = _project.visibleLayers
+        .where(
+          (layer) => layer.features.any(
+            (feature) => feature.visible && feature.coordinates.isNotEmpty,
+          ),
+        )
+        .toList();
+
+    if (exportLayers.isEmpty) {
+      _showMessage('Không có dữ liệu đang hiển thị để xuất KML.');
+      return;
+    }
+
+    final invalidLayers = exportLayers
+        .where((layer) => !layer.crs.isWgs84)
+        .toList();
+
+    if (invalidLayers.isNotEmpty) {
+      await _showInvalidKmlCrsDialog(invalidLayers);
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    try {
+      final bytes = _kmlExportService.exportLayersAsBytes(
+        documentName: _project.name,
+        layers: exportLayers,
+      );
+
+      final outputUri = await FilePicker.saveFile(
+        dialogTitle: 'Xuất dữ liệu Google Earth (KML)',
+        fileName: '${_safeFileName(_project.name)}.kml',
+        bytes: bytes,
+        mimeType: 'application/vnd.google-earth.kml+xml',
+        type: FileType.custom,
+        allowedExtensions: const ['kml'],
+      );
+
+      if (outputUri == null || !mounted) {
+        return;
+      }
+
+      await _showKmlExportSuccessDialog(outputUri);
+    } catch (error) {
+      _showMessage('Không thể xuất KML: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showInvalidKmlCrsDialog(List<MapLayer> invalidLayers) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Chưa thể xuất KML'),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'KML yêu cầu WGS84 (EPSG:4326). '
+                    'Các layer đang hiển thị sau chưa phải WGS84:',
+                  ),
+                  const SizedBox(height: 12),
+                  ...invalidLayers.map(
+                    (layer) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text('• ${layer.name} — ${layer.crs.displayName}'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Hãy gán/định vị CRS, tạo layer WGS84, '
+                    'sau đó ẩn layer nguồn trước khi xuất.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Đã hiểu'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showKmlExportSuccessDialog(Uri outputUri) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        final displayPath = outputUri.scheme == 'file'
+            ? outputUri.toFilePath(windows: Platform.isWindows)
+            : outputUri.toString();
+
+        return AlertDialog(
+          title: const Text('Xuất KML thành công'),
+          content: SizedBox(width: 520, child: SelectableText(displayPath)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Đóng'),
+            ),
+            FilledButton.icon(
+              onPressed: outputUri.scheme == 'file' && Platform.isWindows
+                  ? () {
+                      Navigator.of(context).pop();
+                      _openKmlInGoogleEarth(outputUri);
+                    }
+                  : null,
+              icon: const Icon(Icons.public),
+              label: const Text('Mở bằng Google Earth'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openKmlInGoogleEarth(Uri outputUri) async {
+    if (!Platform.isWindows || outputUri.scheme != 'file') {
+      _showMessage('Chỉ hỗ trợ mở KML tự động trên Windows desktop.');
+      return;
+    }
+
+    try {
+      final path = outputUri.toFilePath(windows: true);
+
+      await Process.start('explorer.exe', [
+        path,
+      ], mode: ProcessStartMode.detached);
+
+      _showMessage(
+        'Đã gửi file KML tới ứng dụng mặc định. '
+        'Nếu Google Earth chưa được cài đặt, '
+        'Windows sẽ yêu cầu chọn ứng dụng.',
+      );
+    } on ProcessException catch (error) {
+      _showMessage(
+        'Windows không thể mở file KML. '
+        'Hãy kiểm tra Google Earth hoặc ứng dụng mặc định: '
+        '${error.message}',
+      );
+    } catch (error) {
+      _showMessage('Không thể mở file KML: $error');
+    }
+  }
+
+  String _safeFileName(String value) {
+    final sanitized = value.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').trim();
+
+    return sanitized.isEmpty ? 'geocad_bridge' : sanitized;
+  }
+
+  void _updateLayerCrs(MapLayer layer, CoordinateReferenceSystem crs) {
     if (layer.crs.type == crs.type &&
         layer.crs.utmZone == crs.utmZone &&
         layer.crs.hemisphere == crs.hemisphere) {
@@ -696,28 +768,18 @@ class _HomeScreenState extends State<HomeScreen> {
     _recordHistory();
 
     setState(() {
-      _project = _project.updateLayer(
-        layer.withCrs(crs),
-      );
+      _project = _project.updateLayer(layer.withCrs(crs));
     });
 
-    _showMessage(
-      'Đã đặt CRS cho "${layer.name}": ${crs.displayName}',
-    );
+    _showMessage('Đã đặt CRS cho "${layer.name}": ${crs.displayName}');
   }
 
   @override
   Widget build(BuildContext context) {
     return Shortcuts(
       shortcuts: const {
-        SingleActivator(
-          LogicalKeyboardKey.keyZ,
-          control: true,
-        ): _UndoIntent(),
-        SingleActivator(
-          LogicalKeyboardKey.keyY,
-          control: true,
-        ): _RedoIntent(),
+        SingleActivator(LogicalKeyboardKey.keyZ, control: true): _UndoIntent(),
+        SingleActivator(LogicalKeyboardKey.keyY, control: true): _RedoIntent(),
       },
       child: Actions(
         actions: {
@@ -742,21 +804,17 @@ class _HomeScreenState extends State<HomeScreen> {
               foregroundColor: Colors.white,
               title: const Text(
                 'AutoCAD ↔ Google Earth',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
                 IconButton(
                   tooltip: 'Undo (Ctrl+Z)',
-                  onPressed:
-                      _history.canUndo ? _undo : null,
+                  onPressed: _history.canUndo ? _undo : null,
                   icon: const Icon(Icons.undo),
                 ),
                 IconButton(
                   tooltip: 'Redo (Ctrl+Y)',
-                  onPressed:
-                      _history.canRedo ? _redo : null,
+                  onPressed: _history.canRedo ? _redo : null,
                   icon: const Icon(Icons.redo),
                 ),
                 const SizedBox(width: 8),
@@ -769,16 +827,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: _LeftPanel(
                     project: _project,
                     isImporting: _isImporting,
+                    isExporting: _isExporting,
                     onOpenCadFiles: _openCadFiles,
-                    onOpenGoogleEarthFiles:
-                        _openGoogleEarthFiles,
-                    onOpenCoordinateConverter:
-                        _openCoordinateConverter,
+                    onOpenGoogleEarthFiles: _openGoogleEarthFiles,
+                    onOpenCoordinateConverter: _openCoordinateConverter,
+                    onExportKml: _exportKml,
                     onUpdateLayerCrs: _updateLayerCrs,
                     onCreateWgs84Layer: _createWgs84Layer,
                     onGeoreferenceLayer: _georeferenceLayer,
-                    onToggleVisibility:
-                        _toggleLayerVisibility,
+                    onToggleVisibility: _toggleLayerVisibility,
                     onToggleLock: _toggleLayerLock,
                     onRemoveLayer: _removeLayer,
                     onMoveLayerUp: _moveLayerUp,
@@ -790,8 +847,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: _Workspace(
                     project: _project,
                     isImporting: _isImporting,
-                    onFeatureChanged:
-                        _applyFeatureChange,
+                    onFeatureChanged: _applyFeatureChange,
                   ),
                 ),
               ],
@@ -814,14 +870,14 @@ class _RedoIntent extends Intent {
 class _LeftPanel extends StatelessWidget {
   final MapProject project;
   final bool isImporting;
+  final bool isExporting;
 
   final VoidCallback onOpenCadFiles;
   final VoidCallback onOpenGoogleEarthFiles;
   final VoidCallback onOpenCoordinateConverter;
-  final void Function(
-    MapLayer layer,
-    CoordinateReferenceSystem crs,
-  ) onUpdateLayerCrs;
+  final VoidCallback onExportKml;
+  final void Function(MapLayer layer, CoordinateReferenceSystem crs)
+  onUpdateLayerCrs;
   final ValueChanged<MapLayer> onCreateWgs84Layer;
   final ValueChanged<MapLayer> onGeoreferenceLayer;
   final ValueChanged<MapLayer> onToggleVisibility;
@@ -833,9 +889,11 @@ class _LeftPanel extends StatelessWidget {
   const _LeftPanel({
     required this.project,
     required this.isImporting,
+    required this.isExporting,
     required this.onOpenCadFiles,
     required this.onOpenGoogleEarthFiles,
     required this.onOpenCoordinateConverter,
+    required this.onExportKml,
     required this.onUpdateLayerCrs,
     required this.onCreateWgs84Layer,
     required this.onGeoreferenceLayer,
@@ -871,8 +929,7 @@ class _LeftPanel extends StatelessWidget {
                       ? 'Đang đọc bản vẽ...'
                       : 'Thêm bản vẽ AutoCAD',
                   subtitle: 'Chọn nhiều DWG / DXF',
-                  onPressed:
-                      isImporting ? null : onOpenCadFiles,
+                  onPressed: isImporting ? null : onOpenCadFiles,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
@@ -881,9 +938,7 @@ class _LeftPanel extends StatelessWidget {
                       ? 'Đang đọc dữ liệu...'
                       : 'Thêm dữ liệu Google Earth',
                   subtitle: 'KML (WGS84 / EPSG:4326)',
-                  onPressed: isImporting
-                      ? null
-                      : onOpenGoogleEarthFiles,
+                  onPressed: isImporting ? null : onOpenGoogleEarthFiles,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
@@ -902,9 +957,11 @@ class _LeftPanel extends StatelessWidget {
                 const SizedBox(height: 10),
                 _ToolButton(
                   icon: Icons.map,
-                  title: 'Xuất sang Google Earth',
-                  subtitle: 'KML / KMZ',
-                  onPressed: () {},
+                  title: isExporting
+                      ? 'Đang xuất KML...'
+                      : 'Xuất sang Google Earth',
+                  subtitle: 'KML (WGS84 / EPSG:4326)',
+                  onPressed: isImporting || isExporting ? null : onExportKml,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
@@ -947,60 +1004,46 @@ class _LeftPanel extends StatelessWidget {
                 if (project.layers.isEmpty)
                   const _EmptyLayerPanel()
                 else
-                  ...List.generate(
-                    project.layers.length,
-                    (index) {
-                      final layer =
-                          project.layers[index];
+                  ...List.generate(project.layers.length, (index) {
+                    final layer = project.layers[index];
 
-                      return Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: 8,
-                        ),
-                        child: _LayerCard(
-                          layer: layer,
-                          isFirst: index == 0,
-                          isLast: index ==
-                              project.layers.length - 1,
-                          onToggleVisibility: () {
-                            onToggleVisibility(layer);
-                          },
-                          onToggleLock: () {
-                            onToggleLock(layer);
-                          },
-                          onRemove: () {
-                            onRemoveLayer(layer.id);
-                          },
-                          onEditCrs: () async {
-                            final crs =
-                                await _showLayerCrsDialog(
-                              context,
-                              layer,
-                            );
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _LayerCard(
+                        layer: layer,
+                        isFirst: index == 0,
+                        isLast: index == project.layers.length - 1,
+                        onToggleVisibility: () {
+                          onToggleVisibility(layer);
+                        },
+                        onToggleLock: () {
+                          onToggleLock(layer);
+                        },
+                        onRemove: () {
+                          onRemoveLayer(layer.id);
+                        },
+                        onEditCrs: () async {
+                          final crs = await _showLayerCrsDialog(context, layer);
 
-                            if (crs != null) {
-                              onUpdateLayerCrs(
-                                layer,
-                                crs,
-                              );
-                            }
-                          },
-                          onCreateWgs84: () {
-                            onCreateWgs84Layer(layer);
-                          },
-                          onGeoreference: () {
-                            onGeoreferenceLayer(layer);
-                          },
-                          onMoveUp: () {
-                            onMoveLayerUp(layer.id);
-                          },
-                          onMoveDown: () {
-                            onMoveLayerDown(layer.id);
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                          if (crs != null) {
+                            onUpdateLayerCrs(layer, crs);
+                          }
+                        },
+                        onCreateWgs84: () {
+                          onCreateWgs84Layer(layer);
+                        },
+                        onGeoreference: () {
+                          onGeoreferenceLayer(layer);
+                        },
+                        onMoveUp: () {
+                          onMoveLayerUp(layer.id);
+                        },
+                        onMoveDown: () {
+                          onMoveLayerDown(layer.id);
+                        },
+                      ),
+                    );
+                  }),
               ],
             ),
           ),
@@ -1011,10 +1054,7 @@ class _LeftPanel extends StatelessWidget {
               '${project.layerCount} lớp • '
               '${project.featureCount} đối tượng',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ),
         ],
@@ -1029,8 +1069,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
 ) async {
   var type = layer.crs.type;
   var zone = layer.crs.utmZone ?? 48;
-  var hemisphere =
-      layer.crs.hemisphere ?? UtmHemisphere.north;
+  var hemisphere = layer.crs.hemisphere ?? UtmHemisphere.north;
 
   return showDialog<CoordinateReferenceSystem>(
     context: context,
@@ -1041,11 +1080,9 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
 
           switch (type) {
             case CoordinateReferenceSystemType.localCad:
-              preview =
-                  const CoordinateReferenceSystem.localCad();
+              preview = const CoordinateReferenceSystem.localCad();
             case CoordinateReferenceSystemType.wgs84:
-              preview =
-                  const CoordinateReferenceSystem.wgs84();
+              preview = const CoordinateReferenceSystem.wgs84();
             case CoordinateReferenceSystemType.utm:
               preview = CoordinateReferenceSystem.utm(
                 utmZone: zone,
@@ -1054,28 +1091,22 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
           }
 
           return AlertDialog(
-            title: const Text(
-              'Thiết lập hệ tọa độ layer',
-            ),
+            title: const Text('Thiết lập hệ tọa độ layer'),
             content: SizedBox(
               width: 520,
               child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       layer.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 18),
-                    DropdownButtonFormField<
-                        CoordinateReferenceSystemType>(
+                    DropdownButtonFormField<CoordinateReferenceSystemType>(
                       initialValue: type,
                       decoration: const InputDecoration(
                         labelText: 'Hệ tọa độ',
@@ -1083,22 +1114,15 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                       ),
                       items: const [
                         DropdownMenuItem(
-                          value:
-                              CoordinateReferenceSystemType.localCad,
-                          child: Text(
-                            'CAD cục bộ / chưa xác định',
-                          ),
+                          value: CoordinateReferenceSystemType.localCad,
+                          child: Text('CAD cục bộ / chưa xác định'),
                         ),
                         DropdownMenuItem(
-                          value:
-                              CoordinateReferenceSystemType.wgs84,
-                          child: Text(
-                            'WGS84 (EPSG:4326)',
-                          ),
+                          value: CoordinateReferenceSystemType.wgs84,
+                          child: Text('WGS84 (EPSG:4326)'),
                         ),
                         DropdownMenuItem(
-                          value:
-                              CoordinateReferenceSystemType.utm,
+                          value: CoordinateReferenceSystemType.utm,
                           child: Text('UTM'),
                         ),
                       ],
@@ -1110,8 +1134,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                         });
                       },
                     ),
-                    if (type ==
-                        CoordinateReferenceSystemType.utm) ...[
+                    if (type == CoordinateReferenceSystemType.utm) ...[
                       const SizedBox(height: 14),
                       Row(
                         children: [
@@ -1126,9 +1149,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                                 60,
                                 (index) => DropdownMenuItem(
                                   value: index + 1,
-                                  child: Text(
-                                    'Zone ${index + 1}',
-                                  ),
+                                  child: Text('Zone ${index + 1}'),
                                 ),
                               ),
                               onChanged: (value) {
@@ -1142,8 +1163,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: DropdownButtonFormField<
-                                UtmHemisphere>(
+                            child: DropdownButtonFormField<UtmHemisphere>(
                               initialValue: hemisphere,
                               decoration: const InputDecoration(
                                 labelText: 'Bán cầu',
@@ -1177,9 +1197,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                       decoration: BoxDecoration(
                         color: const Color(0xFFF4F6F8),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: const Color(0xFFDDE3E8),
-                        ),
+                        border: Border.all(color: const Color(0xFFDDE3E8)),
                       ),
                       child: Row(
                         children: [
@@ -1190,8 +1208,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   preview.displayName,
@@ -1218,10 +1235,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                       'Lưu ý: thao tác này chỉ khai báo CRS '
                       'của layer, không tự thay đổi các giá trị '
                       'tọa độ X/Y đang có.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey,
-                      ),
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
                 ),
@@ -1269,10 +1283,7 @@ class _ToolButton extends StatelessWidget {
       child: FilledButton.tonal(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         child: Row(
           children: [
@@ -1284,18 +1295,14 @@ class _ToolButton extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: TextStyle(
                       fontSize: 11,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSecondaryContainer
+                      color: Theme.of(context).colorScheme.onSecondaryContainer
                           .withValues(alpha: 0.65),
                     ),
                   ),
@@ -1320,18 +1327,13 @@ class _EmptyLayerPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFFE0E0E0),
-        ),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
       ),
       child: const Text(
         'Chưa có lớp dữ liệu.\n'
         'Hãy thêm bản vẽ AutoCAD hoặc dữ liệu Google Earth.',
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey,
-        ),
+        style: TextStyle(fontSize: 12, color: Colors.grey),
       ),
     );
   }
@@ -1371,37 +1373,26 @@ class _LayerCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFFE0E0E0),
-        ),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
       ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              10,
-              10,
-              6,
-              6,
-            ),
+            padding: const EdgeInsets.fromLTRB(10, 10, 6, 6),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconButton(
-                  tooltip:
-                      layer.visible ? 'Ẩn layer' : 'Hiện layer',
+                  tooltip: layer.visible ? 'Ẩn layer' : 'Hiện layer',
                   onPressed: onToggleVisibility,
                   icon: Icon(
-                    layer.visible
-                        ? Icons.visibility
-                        : Icons.visibility_off,
+                    layer.visible ? Icons.visibility : Icons.visibility_off,
                   ),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         layer.name,
@@ -1409,8 +1400,7 @@ class _LayerCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color:
-                              layer.visible ? null : Colors.grey,
+                          color: layer.visible ? null : Colors.grey,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1427,9 +1417,7 @@ class _LayerCard extends StatelessWidget {
                         onTap: onEditCrs,
                         borderRadius: BorderRadius.circular(4),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 2,
-                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -1465,15 +1453,9 @@ class _LayerCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: layer.locked
-                      ? 'Mở khóa layer'
-                      : 'Khóa layer',
+                  tooltip: layer.locked ? 'Mở khóa layer' : 'Khóa layer',
                   onPressed: onToggleLock,
-                  icon: Icon(
-                    layer.locked
-                        ? Icons.lock
-                        : Icons.lock_open,
-                  ),
+                  icon: Icon(layer.locked ? Icons.lock : Icons.lock_open),
                 ),
               ],
             ),
@@ -1485,52 +1467,38 @@ class _LayerCard extends StatelessWidget {
               IconButton(
                 tooltip: 'Đưa layer lên',
                 onPressed: isFirst ? null : onMoveUp,
-                icon: const Icon(
-                  Icons.keyboard_arrow_up,
-                ),
+                icon: const Icon(Icons.keyboard_arrow_up),
               ),
               IconButton(
                 tooltip: 'Đưa layer xuống',
                 onPressed: isLast ? null : onMoveDown,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down,
-                ),
+                icon: const Icon(Icons.keyboard_arrow_down),
               ),
               IconButton(
                 tooltip: 'Định vị layer bằng 2 điểm khống chế',
-                onPressed: layer.isCad &&
-                        layer.features.isNotEmpty
+                onPressed: layer.isCad && layer.features.isNotEmpty
                     ? onGeoreference
                     : null,
-                icon: const Icon(
-                  Icons.add_location_alt_outlined,
-                ),
+                icon: const Icon(Icons.add_location_alt_outlined),
               ),
               IconButton(
                 tooltip: layer.crs.isWgs84
                     ? 'Layer đã là WGS84'
                     : 'Tạo layer WGS84',
-                onPressed: layer.canTransformToWgs84 &&
-                        !layer.crs.isWgs84
+                onPressed: layer.canTransformToWgs84 && !layer.crs.isWgs84
                     ? onCreateWgs84
                     : null,
-                icon: const Icon(
-                  Icons.public,
-                ),
+                icon: const Icon(Icons.public),
               ),
               IconButton(
                 tooltip: 'Thiết lập hệ tọa độ (CRS)',
                 onPressed: onEditCrs,
-                icon: const Icon(
-                  Icons.language,
-                ),
+                icon: const Icon(Icons.language),
               ),
               IconButton(
                 tooltip: 'Xóa layer khỏi dự án',
                 onPressed: onRemove,
-                icon: const Icon(
-                  Icons.delete_outline,
-                ),
+                icon: const Icon(Icons.delete_outline),
               ),
             ],
           ),
@@ -1539,9 +1507,7 @@ class _LayerCard extends StatelessWidget {
     );
   }
 
-  String _layerTypeLabel(
-    MapLayerSourceType type,
-  ) {
+  String _layerTypeLabel(MapLayerSourceType type) {
     switch (type) {
       case MapLayerSourceType.dwg:
         return 'DWG';
@@ -1560,8 +1526,7 @@ class _LayerCard extends StatelessWidget {
 class _Workspace extends StatelessWidget {
   final MapProject project;
   final bool isImporting;
-  final ValueChanged<MapFeatureChange>
-      onFeatureChanged;
+  final ValueChanged<MapFeatureChange> onFeatureChanged;
 
   const _Workspace({
     required this.project,
@@ -1601,14 +1566,11 @@ class _Workspace extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border.all(
-                    color: const Color(0xFFD0D5DA),
-                  ),
+                  border: Border.all(color: const Color(0xFFD0D5DA)),
                 ),
                 child: MapCanvas(
                   project: project,
-                  onFeatureChanged:
-                      onFeatureChanged,
+                  onFeatureChanged: onFeatureChanged,
                 ),
               ),
             ),
@@ -1623,24 +1585,16 @@ class _Workspace extends StatelessWidget {
 class _WorkspaceHeader extends StatelessWidget {
   final MapProject project;
 
-  const _WorkspaceHeader({
-    required this.project,
-  });
+  const _WorkspaceHeader({required this.project});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
-          const Icon(
-            Icons.layers,
-            color: Color(0xFF1565C0),
-          ),
+          const Icon(Icons.layers, color: Color(0xFF1565C0)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1659,10 +1613,7 @@ class _WorkspaceHeader extends StatelessWidget {
                 Text(
                   '${project.layerCount} lớp • '
                   '${project.featureCount} đối tượng',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
                 ),
               ],
             ),
@@ -1676,15 +1627,13 @@ class _WorkspaceHeader extends StatelessWidget {
           _HeaderInfo(
             icon: Icons.public,
             label: 'Google Earth',
-            value:
-                '${project.googleEarthLayers.length}',
+            value: '${project.googleEarthLayers.length}',
           ),
           const SizedBox(width: 20),
           _HeaderInfo(
             icon: Icons.visibility,
             label: 'Đang hiển thị',
-            value:
-                '${project.visibleFeatures.length}',
+            value: '${project.visibleFeatures.length}',
           ),
         ],
       ),
@@ -1707,28 +1656,18 @@ class _HeaderInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 18,
-          color: Colors.grey.shade700,
-        ),
+        Icon(icon, size: 18, color: Colors.grey.shade700),
         const SizedBox(width: 6),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
             ),
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -1740,44 +1679,28 @@ class _HeaderInfo extends StatelessWidget {
 class _WorkspaceStatusBar extends StatelessWidget {
   final MapProject project;
 
-  const _WorkspaceStatusBar({
-    required this.project,
-  });
+  const _WorkspaceStatusBar({required this.project});
 
   @override
   Widget build(BuildContext context) {
-    final visibleLayerCount =
-        project.visibleLayers.length;
+    final visibleLayerCount = project.visibleLayers.length;
 
     return Container(
       color: const Color(0xFFF4F6F8),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 8,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          const Icon(
-            Icons.info_outline,
-            size: 16,
-            color: Colors.grey,
-          ),
+          const Icon(Icons.info_outline, size: 16, color: Colors.grey),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '$visibleLayerCount/${project.layerCount} layer đang hiển thị',
-              style: const TextStyle(
-                fontSize: 11,
-                color: Colors.black54,
-              ),
+              style: const TextStyle(fontSize: 11, color: Colors.black54),
             ),
           ),
           Text(
             '${project.visibleFeatures.length} đối tượng hiển thị',
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.black54,
-            ),
+            style: const TextStyle(fontSize: 11, color: Colors.black54),
           ),
         ],
       ),
@@ -1797,28 +1720,18 @@ class _EmptyWorkspace extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.satellite_alt,
-              size: 90,
-              color: Colors.blue.shade700,
-            ),
+            Icon(Icons.satellite_alt, size: 90, color: Colors.blue.shade700),
             const SizedBox(height: 24),
             const Text(
               'AutoCAD ↔ Google Earth',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             const Text(
               'Lồng ghép • Chỉnh sửa • Chuyển đổi • Xuất bản',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 32),
             const Text(
