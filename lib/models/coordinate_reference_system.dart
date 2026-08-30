@@ -1,13 +1,6 @@
-enum CoordinateReferenceSystemType {
-  localCad,
-  wgs84,
-  utm,
-}
+enum CoordinateReferenceSystemType { localCad, wgs84, utm }
 
-enum UtmHemisphere {
-  north,
-  south,
-}
+enum UtmHemisphere { north, south }
 
 class CoordinateReferenceSystem {
   final CoordinateReferenceSystemType type;
@@ -17,15 +10,14 @@ class CoordinateReferenceSystem {
 
   const CoordinateReferenceSystem.localCad({
     this.name = 'CAD cục bộ / chưa xác định',
-  })  : type = CoordinateReferenceSystemType.localCad,
-        utmZone = null,
-        hemisphere = null;
+  }) : type = CoordinateReferenceSystemType.localCad,
+       utmZone = null,
+       hemisphere = null;
 
-  const CoordinateReferenceSystem.wgs84({
-    this.name = 'WGS84 (EPSG:4326)',
-  })  : type = CoordinateReferenceSystemType.wgs84,
-        utmZone = null,
-        hemisphere = null;
+  const CoordinateReferenceSystem.wgs84({this.name = 'WGS84 (EPSG:4326)'})
+    : type = CoordinateReferenceSystemType.wgs84,
+      utmZone = null,
+      hemisphere = null;
 
   const CoordinateReferenceSystem.utm({
     required this.utmZone,
@@ -33,14 +25,11 @@ class CoordinateReferenceSystem {
     this.name = 'UTM',
   }) : type = CoordinateReferenceSystemType.utm;
 
-  bool get isLocalCad =>
-      type == CoordinateReferenceSystemType.localCad;
+  bool get isLocalCad => type == CoordinateReferenceSystemType.localCad;
 
-  bool get isWgs84 =>
-      type == CoordinateReferenceSystemType.wgs84;
+  bool get isWgs84 => type == CoordinateReferenceSystemType.wgs84;
 
-  bool get isUtm =>
-      type == CoordinateReferenceSystemType.utm;
+  bool get isUtm => type == CoordinateReferenceSystemType.utm;
 
   bool get isValid {
     switch (type) {
@@ -50,10 +39,7 @@ class CoordinateReferenceSystem {
 
       case CoordinateReferenceSystemType.utm:
         final zone = utmZone;
-        return zone != null &&
-            zone >= 1 &&
-            zone <= 60 &&
-            hemisphere != null;
+        return zone != null && zone >= 1 && zone <= 60 && hemisphere != null;
     }
   }
 
@@ -67,11 +53,8 @@ class CoordinateReferenceSystem {
 
       case CoordinateReferenceSystemType.utm:
         final zone = utmZone;
-        final hemi =
-            hemisphere == UtmHemisphere.south ? 'S' : 'N';
-        return zone == null
-            ? 'UTM chưa xác định'
-            : 'UTM Zone $zone$hemi';
+        final hemi = hemisphere == UtmHemisphere.south ? 'S' : 'N';
+        return zone == null ? 'UTM chưa xác định' : 'UTM Zone $zone$hemi';
     }
   }
 
@@ -83,24 +66,15 @@ class CoordinateReferenceSystem {
     final zone = utmZone;
     final hemi = hemisphere;
 
-    if (!isUtm ||
-        zone == null ||
-        hemi == null ||
-        zone < 1 ||
-        zone > 60) {
+    if (!isUtm || zone == null || hemi == null || zone < 1 || zone > 60) {
       return null;
     }
 
-    return hemi == UtmHemisphere.north
-        ? 32600 + zone
-        : 32700 + zone;
+    return hemi == UtmHemisphere.north ? 32600 + zone : 32700 + zone;
   }
 
   Map<String, String> toProperties() {
-    final result = <String, String>{
-      'crsType': type.name,
-      'crsName': name,
-    };
+    final result = <String, String>{'crsType': type.name, 'crsName': name};
 
     final zone = utmZone;
     final hemi = hemisphere;
@@ -126,28 +100,24 @@ class CoordinateReferenceSystem {
   ) {
     final typeName = properties['crsType'];
 
-    if (typeName ==
-        CoordinateReferenceSystemType.wgs84.name) {
+    if (typeName == CoordinateReferenceSystemType.wgs84.name) {
       return const CoordinateReferenceSystem.wgs84();
     }
 
-    if (typeName ==
-        CoordinateReferenceSystemType.utm.name) {
-      final zone =
-          int.tryParse(properties['utmZone'] ?? '');
-      final hemisphereName =
-          properties['utmHemisphere'];
+    if (typeName == CoordinateReferenceSystemType.utm.name) {
+      final zone = int.tryParse(properties['utmZone'] ?? '');
+      final hemisphereName = properties['utmHemisphere'];
 
       if (zone != null &&
           zone >= 1 &&
           zone <= 60 &&
-          hemisphereName != null) {
+          (hemisphereName == UtmHemisphere.north.name ||
+              hemisphereName == UtmHemisphere.south.name)) {
         return CoordinateReferenceSystem.utm(
           utmZone: zone,
-          hemisphere:
-              hemisphereName == UtmHemisphere.south.name
-                  ? UtmHemisphere.south
-                  : UtmHemisphere.north,
+          hemisphere: hemisphereName == UtmHemisphere.south.name
+              ? UtmHemisphere.south
+              : UtmHemisphere.north,
         );
       }
     }

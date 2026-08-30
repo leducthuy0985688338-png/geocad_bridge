@@ -19,8 +19,7 @@ class LayerReprojectionService {
   final CoordinateTransformService coordinateTransformService;
 
   const LayerReprojectionService({
-    this.coordinateTransformService =
-        const CoordinateTransformService(),
+    this.coordinateTransformService = const CoordinateTransformService(),
   });
 
   bool canReproject(
@@ -55,14 +54,13 @@ class LayerReprojectionService {
     }
 
     if (_sameCrs(sourceCrs, targetCrs)) {
+      final copiedFeatures = sourceLayer.features.map(_copyFeature).toList();
+
       final copiedLayer = sourceLayer.copyWith(
         id: newLayerId ?? '${sourceLayer.id}-reprojected',
-        name: newLayerName ??
-            '${sourceLayer.name} (${targetCrs.displayName})',
+        name: newLayerName ?? '${sourceLayer.name} (${targetCrs.displayName})',
         crs: targetCrs,
-        features: List<MapFeature>.from(
-          sourceLayer.features,
-        ),
+        features: copiedFeatures,
         properties: _buildLayerProperties(
           sourceLayer: sourceLayer,
           targetCrs: targetCrs,
@@ -71,23 +69,18 @@ class LayerReprojectionService {
 
       return LayerReprojectionResult(
         layer: copiedLayer,
-        transformedFeatureCount:
-            copiedLayer.features.length,
-        transformedCoordinateCount:
-            copiedLayer.features.fold<int>(
+        transformedFeatureCount: copiedLayer.features.length,
+        transformedCoordinateCount: copiedLayer.features.fold<int>(
           0,
-          (sum, feature) =>
-              sum + feature.coordinates.length,
+          (sum, feature) => sum + feature.coordinates.length,
         ),
       );
     }
 
     var coordinateCount = 0;
 
-    final transformedFeatures =
-        sourceLayer.features.map((feature) {
-      final transformedCoordinates =
-          feature.coordinates.map((coordinate) {
+    final transformedFeatures = sourceLayer.features.map((feature) {
+      final transformedCoordinates = feature.coordinates.map((coordinate) {
         coordinateCount++;
 
         return _transformCoordinate(
@@ -99,13 +92,13 @@ class LayerReprojectionService {
 
       return feature.copyWith(
         coordinates: transformedCoordinates,
+        properties: Map<String, String>.from(feature.properties),
       );
     }).toList();
 
     final resultLayer = sourceLayer.copyWith(
       id: newLayerId ?? '${sourceLayer.id}-reprojected',
-      name: newLayerName ??
-          '${sourceLayer.name} (${targetCrs.displayName})',
+      name: newLayerName ?? '${sourceLayer.name} (${targetCrs.displayName})',
       crs: targetCrs,
       features: transformedFeatures,
       properties: _buildLayerProperties(
@@ -116,8 +109,7 @@ class LayerReprojectionService {
 
     return LayerReprojectionResult(
       layer: resultLayer,
-      transformedFeatureCount:
-          transformedFeatures.length,
+      transformedFeatureCount: transformedFeatures.length,
       transformedCoordinateCount: coordinateCount,
     );
   }
@@ -127,29 +119,33 @@ class LayerReprojectionService {
     required CoordinateReferenceSystem sourceCrs,
     required CoordinateReferenceSystem targetCrs,
   }) {
-    final geographic =
-        coordinateTransformService.toWgs84(
+    final geographic = coordinateTransformService.toWgs84(
       coordinate: coordinate,
       sourceCrs: sourceCrs,
     );
 
-    final transformed =
-        coordinateTransformService.fromWgs84(
+    return coordinateTransformService.fromWgs84(
       coordinate: geographic,
       targetCrs: targetCrs,
     );
+  }
 
-    return MapCoordinate(
-      x: transformed.x,
-      y: transformed.y,
-      z: coordinate.z,
+  MapFeature _copyFeature(MapFeature feature) {
+    return feature.copyWith(
+      coordinates: feature.coordinates
+          .map(
+            (coordinate) => MapCoordinate(
+              x: coordinate.x,
+              y: coordinate.y,
+              z: coordinate.z,
+            ),
+          )
+          .toList(),
+      properties: Map<String, String>.from(feature.properties),
     );
   }
 
-  bool _sameCrs(
-    CoordinateReferenceSystem a,
-    CoordinateReferenceSystem b,
-  ) {
+  bool _sameCrs(CoordinateReferenceSystem a, CoordinateReferenceSystem b) {
     return a.type == b.type &&
         a.utmZone == b.utmZone &&
         a.hemisphere == b.hemisphere;
@@ -159,8 +155,7 @@ class LayerReprojectionService {
     required MapLayer sourceLayer,
     required CoordinateReferenceSystem targetCrs,
   }) {
-    final properties =
-        Map<String, String>.from(sourceLayer.properties);
+    final properties = Map<String, String>.from(sourceLayer.properties);
 
     properties.addAll({
       'reprojected': 'true',
