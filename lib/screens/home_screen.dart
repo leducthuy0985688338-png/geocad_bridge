@@ -503,6 +503,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _georeferenceLayer(MapLayer sourceLayer) async {
+    if (!sourceLayer.isCad ||
+        !sourceLayer.crs.isLocalCad ||
+        sourceLayer.features.isEmpty) {
+      _showMessage('Chỉ có thể định vị layer CAD cục bộ có dữ liệu hình học.');
+      return;
+    }
+
     final request = await showDialog<LayerGeoreferenceRequest>(
       context: context,
       builder: (context) {
@@ -1476,7 +1483,10 @@ class _LayerCard extends StatelessWidget {
               ),
               IconButton(
                 tooltip: 'Định vị layer bằng 2 điểm khống chế',
-                onPressed: layer.isCad && layer.features.isNotEmpty
+                onPressed:
+                    layer.isCad &&
+                        layer.crs.isLocalCad &&
+                        layer.features.isNotEmpty
                     ? onGeoreference
                     : null,
                 icon: const Icon(Icons.add_location_alt_outlined),
