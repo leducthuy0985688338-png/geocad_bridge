@@ -4,6 +4,7 @@ import 'dart:ui' show AppExitResponse;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart' as file_selector;
 
 import '../models/cad_document.dart';
 import '../models/coordinate_reference_system.dart';
@@ -25,9 +26,15 @@ import '../widgets/layer_georeference_dialog.dart';
 import '../widgets/map_canvas.dart';
 import '../widgets/unsaved_changes_dialog.dart';
 
+typedef ProjectSavePathSelector = Future<String?> Function({
+  required String suggestedName,
+  required List<String> allowedExtensions,
+});
+
 class HomeScreen extends StatefulWidget {
   final MapProject? initialProject;
   final Future<bool> Function(MapProject project)? saveProjectOverride;
+  final ProjectSavePathSelector? projectSavePathSelectorOverride;
   final Future<GeoCadProjectDocument?> Function()? openProjectOverride;
   final Future<Uri?> Function(Uint8List bytes)? saveDxfOverride;
   final Future<CoordinateReferenceSystem?> Function(MapLayer layer)?
@@ -37,6 +44,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.initialProject,
     this.saveProjectOverride,
+    this.projectSavePathSelectorOverride,
     this.openProjectOverride,
     this.saveDxfOverride,
     this.selectUtmCrsOverride,
@@ -204,15 +212,30 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_hasBlockingProjectOperation) return false;
     final override = widget.saveProjectOverride;
     if (override != null) return _saveProject();
-    final uri = await FilePicker.saveFile(
-      dialogTitle: 'Lưu GeoCAD Project',
-      fileName: '${_safeFileName(_project.name)}.geocad',
-      type: FileType.custom,
+    final pathSelector =
+        widget.projectSavePathSelectorOverride ?? _selectProjectSavePath;
+    final path = await pathSelector(
+      suggestedName: '${_safeFileName(_project.name)}.geocad',
       allowedExtensions: const ['geocad'],
-      bytes: Uint8List(0),
     );
-    if (uri == null || !mounted) return false;
-    return _saveProjectTo(uri.toFilePath(), updateCurrentPath: true);
+    if (path == null || !mounted) return false;
+    return _saveProjectTo(path, updateCurrentPath: true);
+  }
+
+  Future<String?> _selectProjectSavePath({
+    required String suggestedName,
+    required List<String> allowedExtensions,
+  }) async {
+    final location = await file_selector.getSaveLocation(
+      suggestedName: suggestedName,
+      acceptedTypeGroups: [
+        file_selector.XTypeGroup(
+          label: 'GeoCAD Project',
+          extensions: allowedExtensions,
+        ),
+      ],
+    );
+    return location?.path;
   }
 
   Future<bool> _saveProjectTo(
