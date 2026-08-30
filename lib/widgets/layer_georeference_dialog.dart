@@ -307,6 +307,9 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
                     index: index,
                     entry: _entries[index],
                     residual: residual,
+                    isSuspected:
+                        _preview?.assessment.isSuspected(index) ?? false,
+                    isUniqueWorst: _preview?.uniqueWorstPointIndex == index,
                     canRemove: _entries.length > 2,
                     onChanged: _invalidatePreview,
                     onRemove: () => _removeControlPoint(index),
@@ -441,6 +444,8 @@ class _ControlPointEditor extends StatelessWidget {
   final int index;
   final _ControlPointEntry entry;
   final GeoreferenceResidual? residual;
+  final bool isSuspected;
+  final bool isUniqueWorst;
   final bool canRemove;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
@@ -449,6 +454,8 @@ class _ControlPointEditor extends StatelessWidget {
     required this.index,
     required this.entry,
     required this.residual,
+    required this.isSuspected,
+    required this.isUniqueWorst,
     required this.canRemove,
     required this.onChanged,
     required this.onRemove,
@@ -457,13 +464,22 @@ class _ControlPointEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final number = index + 1;
+    final highlightColor = isSuspected
+        ? const Color(0xFFD84315)
+        : isUniqueWorst
+        ? const Color(0xFFF9A825)
+        : const Color(0xFFDDE3E8);
     return Container(
       key: Key('control-point-$index'),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FB),
+        color: isSuspected
+            ? const Color(0xFFFFF3E0)
+            : isUniqueWorst
+            ? const Color(0xFFFFFDE7)
+            : const Color(0xFFF7F9FB),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFDDE3E8)),
+        border: Border.all(color: highlightColor, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -476,6 +492,25 @@ class _ControlPointEditor extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
+              if (isSuspected)
+                const Text(
+                  'Nghi ngờ — cần kiểm tra',
+                  key: Key('suspected-point-label'),
+                  style: TextStyle(
+                    color: Color(0xFFD84315),
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              else if (isUniqueWorst)
+                const Text(
+                  'Sai số lớn nhất',
+                  key: Key('worst-point-label'),
+                  style: TextStyle(
+                    color: Color(0xFFF57F17),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              if (isSuspected || isUniqueWorst) const SizedBox(width: 8),
               if (canRemove)
                 IconButton(
                   key: Key('remove-control-point-$index'),
@@ -548,6 +583,7 @@ class _FitSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final assessment = fit.assessment;
     return Container(
       key: const Key('georeference-fit-summary'),
       padding: const EdgeInsets.all(14),
@@ -584,8 +620,47 @@ class _FitSummary extends StatelessWidget {
             'Sai số lớn nhất: ${fit.maxResidual.planarError.toStringAsFixed(4)} m '
             '(điểm ${fit.maxResidualIndex + 1})',
           ),
+          const SizedBox(height: 8),
+          _QualityMessage(assessment: assessment),
         ],
       ),
+    );
+  }
+}
+
+class _QualityMessage extends StatelessWidget {
+  final GeoreferenceOutlierAssessment assessment;
+
+  const _QualityMessage({required this.assessment});
+
+  @override
+  Widget build(BuildContext context) {
+    final (text, color) = switch (assessment.status) {
+      GeoreferenceReviewStatus.notApplicable => (
+        'Hai điểm: không áp dụng phát hiện outlier.',
+        const Color(0xFF455A64),
+      ),
+      GeoreferenceReviewStatus.insufficientSample => (
+        'Chưa đủ mẫu để đánh giá outlier; điểm lớn nhất chỉ mang tính tham khảo.',
+        const Color(0xFFF57F17),
+      ),
+      GeoreferenceReviewStatus.noRelativeAnomaly => (
+        'Không phát hiện bất thường tương đối trong các residual.',
+        const Color(0xFF2E7D32),
+      ),
+      GeoreferenceReviewStatus.reviewSuggested => (
+        'Có điểm nghi ngờ — hãy kiểm tra hoặc chỉnh sửa thủ công.',
+        const Color(0xFFD84315),
+      ),
+      GeoreferenceReviewStatus.multipleLargeResiduals => (
+        'Nhiều residual cần được kiểm tra tổng thể.',
+        const Color(0xFFD84315),
+      ),
+    };
+    return Text(
+      text,
+      key: const Key('georeference-quality-message'),
+      style: TextStyle(color: color, fontWeight: FontWeight.w600),
     );
   }
 }

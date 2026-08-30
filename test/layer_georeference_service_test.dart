@@ -781,4 +781,155 @@ void main() {
       returnsNormally,
     );
   });
+
+  List<GeoreferenceControlPoint> qualityPoints(int count) {
+    return List.generate(
+      count,
+      (index) => controlPoint(
+        localX: index.toDouble(),
+        localY: index.isEven ? 0 : 1,
+        targetX: 500000 + index * 10,
+        targetY: 1800000 + (index.isEven ? 0 : 10),
+      ),
+    );
+  }
+
+  List<GeoreferenceResidual> qualityResiduals(List<double> errors) {
+    return List.generate(
+      errors.length,
+      (index) => GeoreferenceResidual(
+        controlPointIndex: index,
+        deltaX: errors[index],
+        deltaY: 0,
+        planarError: errors[index],
+      ),
+    );
+  }
+
+  test(
+    'two-point quality control is not applicable without worst highlight',
+    () {
+      final assessment = service.assessResiduals(
+        controlPoints: qualityPoints(2),
+        residuals: qualityResiduals([0, 0]),
+      );
+
+      expect(assessment.status, GeoreferenceReviewStatus.notApplicable);
+      expect(assessment.suspectedPointIndices, isEmpty);
+      expect(assessment.uniqueWorstPointIndex, isNull);
+    },
+  );
+
+  test('three and four points are insufficient samples without suspects', () {
+    for (final count in [3, 4]) {
+      final assessment = service.assessResiduals(
+        controlPoints: qualityPoints(count),
+        residuals: qualityResiduals([
+          for (var index = 0; index < count; index++) index.toDouble(),
+        ]),
+      );
+      expect(assessment.status, GeoreferenceReviewStatus.insufficientSample);
+      expect(assessment.suspectedPointIndices, isEmpty);
+      expect(assessment.uniqueWorstPointIndex, count - 1);
+    }
+  });
+
+  test('clean five-point dataset has no relative anomaly', () {
+    final assessment = service.assessResiduals(
+      controlPoints: qualityPoints(5),
+      residuals: qualityResiduals([1, 1.1, 0.9, 1.05, 0.95]),
+    );
+
+    expect(assessment.status, GeoreferenceReviewStatus.noRelativeAnomaly);
+    expect(assessment.suspectedPointIndices, isEmpty);
+  });
+
+  test('modified Z deterministically identifies one suspected point', () {
+    final assessment = service.assessResiduals(
+      controlPoints: qualityPoints(5),
+      residuals: qualityResiduals([1, 1.1, 0.9, 1.05, 2]),
+    );
+
+    expect(assessment.status, GeoreferenceReviewStatus.reviewSuggested);
+    expect(assessment.suspectedPointIndices, [4]);
+    expect(assessment.uniqueWorstPointIndex, 4);
+    expect(assessment.hasTiedMaximum, isFalse);
+  });
+
+  test('tied maximum has no unique worst point', () {
+    final assessment = service.assessResiduals(
+      controlPoints: qualityPoints(5),
+      residuals: qualityResiduals([1, 1, 1, 5, 5]),
+    );
+
+    expect(assessment.status, GeoreferenceReviewStatus.multipleLargeResiduals);
+    expect(assessment.uniqueWorstPointIndex, isNull);
+    expect(assessment.hasTiedMaximum, isTrue);
+    expect(assessment.suspectedPointIndices, isEmpty);
+  });
+
+  test('MAD zero handles equal and near-zero residuals deterministically', () {
+    for (final errors in [
+      [1.0, 1.0, 1.0, 1.0, 1.0],
+      [0.0, 1e-12, 0.0, 1e-12, 0.0],
+    ]) {
+      final assessment = service.assessResiduals(
+        controlPoints: qualityPoints(5),
+        residuals: qualityResiduals(errors),
+      );
+      expect(assessment.status, GeoreferenceReviewStatus.noRelativeAnomaly);
+      expect(assessment.suspectedPointIndices, isEmpty);
+    }
+  });
+
+  test('MAD zero identifies exactly one deviation from a unique baseline', () {
+    final assessment = service.assessResiduals(
+      controlPoints: qualityPoints(5),
+      residuals: qualityResiduals([1, 1, 1, 1, 5]),
+    );
+
+    expect(assessment.status, GeoreferenceReviewStatus.reviewSuggested);
+    expect(assessment.suspectedPointIndices, [4]);
+  });
+
+  test('MAD zero does not blame one point when multiple deviations exist', () {
+    final assessment = service.assessResiduals(
+      controlPoints: qualityPoints(5),
+      residuals: qualityResiduals([1, 1, 1, 5, 6]),
+    );
+
+    expect(assessment.status, GeoreferenceReviewStatus.multipleLargeResiduals);
+    expect(assessment.suspectedPointIndices, isEmpty);
+  });
+
+  test('custom outlier threshold is honored without changing fit values', () {
+    final points = qualityPoints(5);
+    final residuals = qualityResiduals([1, 1.1, 0.9, 1.05, 2]);
+    final normal = service.assessResiduals(
+      controlPoints: points,
+      residuals: residuals,
+    );
+    final strict = service.assessResiduals(
+      controlPoints: points,
+      residuals: residuals,
+      options: const GeoreferenceOutlierOptions(modifiedZThreshold: 20),
+    );
+
+    expect(normal.suspectedPointIndices, [4]);
+    expect(strict.suspectedPointIndices, isEmpty);
+
+    final fit = service.fitControlPoints(
+      controlPoints: [
+        controlPoint(localX: 0, localY: 0, targetX: 100, targetY: 200),
+        controlPoint(localX: 10, localY: 0, targetX: 110, targetY: 200),
+        controlPoint(localX: 0, localY: 10, targetX: 100, targetY: 210),
+        controlPoint(localX: 10, localY: 10, targetX: 110, targetY: 210),
+        controlPoint(localX: 5, localY: 5, targetX: 105, targetY: 205),
+      ],
+    );
+    expect(fit.controlPointCount, 5);
+    expect(fit.residuals, hasLength(5));
+    expect(fit.rmse, closeTo(0, 1e-10));
+    expect(fit.transform.scale, closeTo(1, 1e-12));
+  });
 }

@@ -73,12 +73,45 @@ class GeoreferenceResidual {
   });
 }
 
+enum GeoreferenceReviewStatus {
+  notApplicable,
+  insufficientSample,
+  noRelativeAnomaly,
+  reviewSuggested,
+  multipleLargeResiduals,
+}
+
+class GeoreferenceOutlierOptions {
+  final double modifiedZThreshold;
+
+  const GeoreferenceOutlierOptions({this.modifiedZThreshold = 3.5});
+}
+
+class GeoreferenceOutlierAssessment {
+  final GeoreferenceReviewStatus status;
+  final List<int> suspectedPointIndices;
+  final int? uniqueWorstPointIndex;
+  final bool hasTiedMaximum;
+  final double numericalTolerance;
+
+  GeoreferenceOutlierAssessment({
+    required this.status,
+    required List<int> suspectedPointIndices,
+    required this.uniqueWorstPointIndex,
+    required this.hasTiedMaximum,
+    required this.numericalTolerance,
+  }) : suspectedPointIndices = List<int>.unmodifiable(suspectedPointIndices);
+
+  bool isSuspected(int index) => suspectedPointIndices.contains(index);
+}
+
 class GeoreferenceFitResult {
   final GeoreferenceTransform transform;
   final List<GeoreferenceResidual> residuals;
   final double rmse;
   final GeoreferenceResidual maxResidual;
   final String method;
+  final GeoreferenceOutlierAssessment assessment;
 
   GeoreferenceFitResult({
     required this.transform,
@@ -86,10 +119,21 @@ class GeoreferenceFitResult {
     required this.rmse,
     required this.maxResidual,
     required this.method,
-  }) : residuals = List<GeoreferenceResidual>.unmodifiable(residuals);
+    GeoreferenceOutlierAssessment? assessment,
+  }) : residuals = List<GeoreferenceResidual>.unmodifiable(residuals),
+       assessment =
+           assessment ??
+           GeoreferenceOutlierAssessment(
+             status: GeoreferenceReviewStatus.notApplicable,
+             suspectedPointIndices: const [],
+             uniqueWorstPointIndex: null,
+             hasTiedMaximum: false,
+             numericalTolerance: 1e-9,
+           );
 
   int get controlPointCount => residuals.length;
   int get maxResidualIndex => maxResidual.controlPointIndex;
+  int? get uniqueWorstPointIndex => assessment.uniqueWorstPointIndex;
 }
 
 class LayerGeoreferenceResult {
@@ -105,6 +149,7 @@ class LayerGeoreferenceResult {
   final GeoreferenceResidual? maxResidual;
   final int controlPointCount;
   final String georeferenceMethod;
+  final GeoreferenceOutlierAssessment? assessment;
 
   const LayerGeoreferenceResult({
     required this.layer,
@@ -117,9 +162,11 @@ class LayerGeoreferenceResult {
     this.maxResidual,
     this.controlPointCount = 2,
     this.georeferenceMethod = '2-point similarity transform',
+    this.assessment,
   });
 
   int get maxResidualIndex => maxResidual?.controlPointIndex ?? -1;
+  int? get uniqueWorstPointIndex => assessment?.uniqueWorstPointIndex;
 }
 
 class LayerGeoreferenceService {
@@ -198,6 +245,8 @@ class LayerGeoreferenceService {
   GeoreferenceFitResult fitControlPoints({
     required List<GeoreferenceControlPoint> controlPoints,
     CoordinateReferenceSystem? targetCrs,
+    GeoreferenceOutlierOptions outlierOptions =
+        const GeoreferenceOutlierOptions(),
   }) {
     if (controlPoints.length < 2) {
       throw ArgumentError('Cần ít nhất 2 điểm khống chế để định vị.');
@@ -235,6 +284,7 @@ class LayerGeoreferenceService {
       controlPoints: controlPoints,
       transform: transform,
       method: method,
+      outlierOptions: outlierOptions,
     );
   }
 
@@ -262,6 +312,8 @@ class LayerGeoreferenceService {
     required CoordinateReferenceSystem targetCrs,
     String? newLayerId,
     String? newLayerName,
+    GeoreferenceOutlierOptions outlierOptions =
+        const GeoreferenceOutlierOptions(),
   }) {
     if (!sourceLayer.crs.isLocalCad) {
       throw ArgumentError(
@@ -275,6 +327,7 @@ class LayerGeoreferenceService {
     final fit = fitControlPoints(
       controlPoints: controlPoints,
       targetCrs: targetCrs,
+      outlierOptions: outlierOptions,
     );
     var coordinateCount = 0;
     final transformedFeatures = sourceLayer.features.map((feature) {
@@ -307,6 +360,12 @@ class LayerGeoreferenceService {
         'georeferenceMaxResidual': fit.maxResidual.planarError
             .toStringAsPrecision(15),
         'georeferenceMaxResidualIndex': fit.maxResidualIndex.toString(),
+        'georeferenceReviewStatus': fit.assessment.status.name,
+        'georeferenceSuspectedPointIndices': fit
+            .assessment
+            .suspectedPointIndices
+            .join(','),
+        'georeferenceHasTiedMaximum': fit.assessment.hasTiedMaximum.toString(),
         'targetCrs': targetCrs.displayName,
       });
 
@@ -334,6 +393,7 @@ class LayerGeoreferenceService {
       maxResidual: fit.maxResidual,
       controlPointCount: fit.controlPointCount,
       georeferenceMethod: fit.method,
+      assessment: fit.assessment,
     );
   }
 
@@ -406,6 +466,7 @@ class LayerGeoreferenceService {
     required List<GeoreferenceControlPoint> controlPoints,
     required GeoreferenceTransform transform,
     required String method,
+    required GeoreferenceOutlierOptions outlierOptions,
   }) {
     final residuals = <GeoreferenceResidual>[];
     var squaredErrorSum = 0.0;
@@ -440,6 +501,11 @@ class LayerGeoreferenceService {
       (current, candidate) =>
           candidate.planarError > current.planarError ? candidate : current,
     );
+    final assessment = assessResiduals(
+      controlPoints: controlPoints,
+      residuals: residuals,
+      options: outlierOptions,
+    );
 
     return GeoreferenceFitResult(
       transform: transform,
@@ -447,7 +513,142 @@ class LayerGeoreferenceService {
       rmse: rmse,
       maxResidual: maxResidual,
       method: method,
+      assessment: assessment,
     );
+  }
+
+  GeoreferenceOutlierAssessment assessResiduals({
+    required List<GeoreferenceControlPoint> controlPoints,
+    required List<GeoreferenceResidual> residuals,
+    GeoreferenceOutlierOptions options = const GeoreferenceOutlierOptions(),
+  }) {
+    if (controlPoints.length != residuals.length || residuals.length < 2) {
+      throw ArgumentError(
+        'Control points và residuals phải có cùng số lượng, tối thiểu là 2.',
+      );
+    }
+    for (var index = 0; index < residuals.length; index++) {
+      final residual = residuals[index];
+      if (residual.controlPointIndex != index ||
+          !residual.deltaX.isFinite ||
+          !residual.deltaY.isFinite ||
+          !residual.planarError.isFinite ||
+          residual.planarError < 0) {
+        throw ArgumentError('Residual điểm ${index + 1} không hợp lệ.');
+      }
+    }
+    if (!options.modifiedZThreshold.isFinite ||
+        options.modifiedZThreshold <= 0) {
+      throw ArgumentError('Tùy chọn phát hiện outlier không hợp lệ.');
+    }
+
+    final tolerance = _datasetTolerance(
+      controlPoints.map((point) => point.target),
+    );
+    final errors = residuals.map((residual) => residual.planarError).toList();
+    final maximum = errors.reduce(math.max);
+    final maximumIndices = <int>[
+      for (var index = 0; index < errors.length; index++)
+        if ((errors[index] - maximum).abs() <= tolerance) index,
+    ];
+    final uniqueWorst = maximumIndices.length == 1
+        ? maximumIndices.single
+        : null;
+
+    if (errors.length == 2) {
+      return GeoreferenceOutlierAssessment(
+        status: GeoreferenceReviewStatus.notApplicable,
+        suspectedPointIndices: const [],
+        uniqueWorstPointIndex: null,
+        hasTiedMaximum: maximumIndices.length > 1,
+        numericalTolerance: tolerance,
+      );
+    }
+    if (errors.length < 5) {
+      return GeoreferenceOutlierAssessment(
+        status: GeoreferenceReviewStatus.insufficientSample,
+        suspectedPointIndices: const [],
+        uniqueWorstPointIndex: uniqueWorst,
+        hasTiedMaximum: maximumIndices.length > 1,
+        numericalTolerance: tolerance,
+      );
+    }
+
+    final median = _median(errors);
+    final deviations = errors.map((error) => (error - median).abs()).toList();
+    final mad = _median(deviations);
+    List<int> suspected;
+    GeoreferenceReviewStatus status;
+
+    if (mad <= tolerance) {
+      final groups = <List<int>>[];
+      for (var index = 0; index < errors.length; index++) {
+        List<int>? matchingGroup;
+        for (final group in groups) {
+          if ((errors[group.first] - errors[index]).abs() <= tolerance) {
+            matchingGroup = group;
+            break;
+          }
+        }
+        if (matchingGroup == null) {
+          groups.add([index]);
+        } else {
+          matchingGroup.add(index);
+        }
+      }
+      if (groups.length == 1) {
+        suspected = const [];
+        status = GeoreferenceReviewStatus.noRelativeAnomaly;
+      } else {
+        final largestSize = groups
+            .map((group) => group.length)
+            .reduce(math.max);
+        final baselineGroups = groups
+            .where((group) => group.length == largestSize)
+            .toList();
+        final outside = baselineGroups.length == 1
+            ? <int>[
+                for (final group in groups)
+                  if (!identical(group, baselineGroups.single)) ...group,
+              ]
+            : <int>[];
+        if (baselineGroups.length == 1 && outside.length == 1) {
+          suspected = outside;
+          status = GeoreferenceReviewStatus.reviewSuggested;
+        } else {
+          suspected = const [];
+          status = GeoreferenceReviewStatus.multipleLargeResiduals;
+        }
+      }
+    } else {
+      suspected = <int>[
+        for (var index = 0; index < errors.length; index++)
+          if (0.67448975 * (errors[index] - median) / mad >
+              options.modifiedZThreshold)
+            index,
+      ];
+      status = suspected.isEmpty
+          ? GeoreferenceReviewStatus.noRelativeAnomaly
+          : suspected.length == 1
+          ? GeoreferenceReviewStatus.reviewSuggested
+          : GeoreferenceReviewStatus.multipleLargeResiduals;
+    }
+
+    return GeoreferenceOutlierAssessment(
+      status: status,
+      suspectedPointIndices: suspected,
+      uniqueWorstPointIndex: uniqueWorst,
+      hasTiedMaximum: maximumIndices.length > 1,
+      numericalTolerance: tolerance,
+    );
+  }
+
+  double _median(List<double> values) {
+    final sorted = List<double>.from(values)..sort();
+    final middle = sorted.length ~/ 2;
+    return sorted.length.isOdd
+        ? sorted[middle]
+        : (sorted[middle - 1] + sorted[middle]) / 2;
   }
 
   void _validatePairwiseDistances(
