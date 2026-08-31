@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../models/map_feature.dart';
 import '../models/map_feature_change.dart';
 import '../models/map_project.dart';
+import '../services/feature_style_resolver.dart';
 import '../services/map_selection_service.dart';
 import '../services/map_snap_service.dart';
 import 'cad_grid_painter.dart';
@@ -1760,6 +1761,13 @@ class _EmptyMapCanvas extends StatelessWidget {
 }
 
 class _MapProjectPainter extends CustomPainter {
+  static const _styleResolver = FeatureStyleResolver();
+
+  static const _defaultGeometryColor = Color(0xFF1565C0);
+  static const _defaultPointColor = Color(0xFFD32F2F);
+  static const _defaultTextColor = Color(0xFF5E35B1);
+  static const double _defaultStrokeWidth = 1.5;
+
   final List<MapFeature> features;
   final double zoom;
   final Offset pan;
@@ -1797,25 +1805,16 @@ class _MapProjectPainter extends CustomPainter {
 
     canvas.translate(-center.dx, -center.dy);
 
-    final geometryPaint = Paint()
-      ..color = const Color(0xFF1565C0)
-      ..strokeWidth = 1.5 / zoom
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final pointPaint = Paint()
-      ..color = const Color(0xFFD32F2F)
-      ..style = PaintingStyle.fill;
-
     for (final feature in features) {
+      final style = _styleResolver.resolve(feature);
+
       switch (feature.type) {
         case MapFeatureType.point:
-          _drawPoint(canvas, feature, baseTransform, pointPaint);
+          _drawPoint(canvas, feature, baseTransform, style);
           break;
 
         case MapFeatureType.line:
-          _drawLine(canvas, feature, baseTransform, geometryPaint);
+          _drawLine(canvas, feature, baseTransform, style);
           break;
 
         case MapFeatureType.polyline:
@@ -1823,28 +1822,31 @@ class _MapProjectPainter extends CustomPainter {
             canvas,
             feature,
             baseTransform,
-            geometryPaint,
+            _strokePaint(style),
             closePath: false,
           );
           break;
 
         case MapFeatureType.polygon:
-          _drawPolyline(
-            canvas,
-            feature,
-            baseTransform,
-            geometryPaint,
-            closePath: true,
-          );
+          _drawPolygon(canvas, feature, baseTransform, style);
           break;
 
         case MapFeatureType.text:
-          _drawText(canvas, feature, baseTransform);
+          _drawText(canvas, feature, baseTransform, style);
           break;
       }
     }
 
     canvas.restore();
+  }
+
+  Paint _strokePaint(ResolvedFeatureStyle style) {
+    return Paint()
+      ..color = style.strokeColor ?? _defaultGeometryColor
+      ..strokeWidth = (style.strokeWidth ?? _defaultStrokeWidth) / zoom
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
   }
 
   _MapBounds? _calculateBounds() {
@@ -1876,13 +1878,17 @@ class _MapProjectPainter extends CustomPainter {
     Canvas canvas,
     MapFeature feature,
     _MapTransform transform,
-    Paint paint,
+    ResolvedFeatureStyle style,
   ) {
     if (feature.coordinates.isEmpty) {
       return;
     }
 
     final position = transform.toCanvas(feature.coordinates.first);
+
+    final paint = Paint()
+      ..color = style.strokeColor ?? _defaultPointColor
+      ..style = PaintingStyle.fill;
 
     canvas.drawCircle(position, 3.5 / zoom, paint);
   }
@@ -1891,7 +1897,7 @@ class _MapProjectPainter extends CustomPainter {
     Canvas canvas,
     MapFeature feature,
     _MapTransform transform,
-    Paint paint,
+    ResolvedFeatureStyle style,
   ) {
     if (feature.coordinates.length < 2) {
       return;
@@ -1901,18 +1907,16 @@ class _MapProjectPainter extends CustomPainter {
 
     final end = transform.toCanvas(feature.coordinates[1]);
 
-    canvas.drawLine(start, end, paint);
+    canvas.drawLine(start, end, _strokePaint(style));
   }
 
-  void _drawPolyline(
-    Canvas canvas,
+  Path? _buildPath(
     MapFeature feature,
-    _MapTransform transform,
-    Paint paint, {
+    _MapTransform transform, {
     required bool closePath,
   }) {
     if (feature.coordinates.length < 2) {
-      return;
+      return null;
     }
 
     final path = Path();
@@ -1931,10 +1935,59 @@ class _MapProjectPainter extends CustomPainter {
       path.close();
     }
 
+    return path;
+  }
+
+  void _drawPolyline(
+    Canvas canvas,
+    MapFeature feature,
+    _MapTransform transform,
+    Paint paint, {
+    required bool closePath,
+  }) {
+    final path = _buildPath(feature, transform, closePath: closePath);
+
+    if (path == null) {
+      return;
+    }
+
     canvas.drawPath(path, paint);
   }
 
-  void _drawText(Canvas canvas, MapFeature feature, _MapTransform transform) {
+  void _drawPolygon(
+    Canvas canvas,
+    MapFeature feature,
+    _MapTransform transform,
+    ResolvedFeatureStyle style,
+  ) {
+    final path = _buildPath(feature, transform, closePath: true);
+
+    if (path == null) {
+      return;
+    }
+
+    final fillColor = style.fillColor;
+
+    if (style.fill && fillColor != null) {
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = fillColor
+          ..style = PaintingStyle.fill,
+      );
+    }
+
+    if (style.outline) {
+      canvas.drawPath(path, _strokePaint(style));
+    }
+  }
+
+  void _drawText(
+    Canvas canvas,
+    MapFeature feature,
+    _MapTransform transform,
+    ResolvedFeatureStyle style,
+  ) {
     if (feature.coordinates.isEmpty) {
       return;
     }
@@ -1954,7 +2007,7 @@ class _MapProjectPainter extends CustomPainter {
       text: TextSpan(
         text: content,
         style: TextStyle(
-          color: const Color(0xFF5E35B1),
+          color: style.strokeColor ?? _defaultTextColor,
           fontSize: 13 / zoom,
           fontWeight: FontWeight.w600,
         ),
