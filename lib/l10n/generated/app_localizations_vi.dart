@@ -184,4 +184,115 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get unlockLayer => 'Mở khóa layer';
+
+  @override
+  String get projectOpenedWithWarnings => 'Project đã mở với cảnh báo';
+
+  @override
+  String get geometryRestoredMissingSources =>
+      'Geometry đã được khôi phục. Một số file nguồn không còn tồn tại:';
+
+  @override
+  String get close => 'Đóng';
+
+  @override
+  String get googleEarthImportResult => 'Kết quả nhập Google Earth';
+
+  @override
+  String googleEarthFilesImported(int count) {
+    return 'Đã thêm thành công: $count file KML';
+  }
+
+  @override
+  String googleEarthFilesSkipped(int count) {
+    return 'Đã bỏ qua: $count file đang có trong dự án';
+  }
+
+  @override
+  String get unreadableFiles => 'Các file không đọc được:';
+
+  @override
+  String get dxfImportResult => 'Kết quả nhập DXF';
+
+  @override
+  String dxfLayersImported(int count) {
+    return 'Đã thêm: $count layer DXF';
+  }
+
+  @override
+  String dxfEntitiesImported(int count) {
+    return 'Đã nhập: $count entity';
+  }
+
+  @override
+  String dxfMalformedSkipped(int count) {
+    return 'Malformed đã bỏ qua: $count';
+  }
+
+  @override
+  String dxfUnsupportedEntities(int count) {
+    return 'Entity chưa hỗ trợ: $count';
+  }
+
+  @override
+  String get dxfFidelityWarnings => 'Cảnh báo fidelity:';
+
+  @override
+  String get cadImportResult => 'Kết quả nhập bản vẽ';
+
+  @override
+  String cadFilesImported(int count) {
+    return 'Đã thêm thành công: $count file';
+  }
+
+  @override
+  String get kmlExportUnavailable => 'Chưa thể xuất KML';
+
+  @override
+  String get kmlRequiresWgs84 =>
+      'KML yêu cầu WGS84 (EPSG:4326). Các layer đang hiển thị sau chưa phải WGS84:';
+
+  @override
+  String get kmlPrepareWgs84Hint =>
+      'Hãy gán/định vị CRS, tạo layer WGS84, sau đó ẩn layer nguồn trước khi xuất.';
+
+  @override
+  String get understood => 'Đã hiểu';
+
+  @override
+  String get kmlExportSucceeded => 'Xuất KML thành công';
+
+  @override
+  String get openWithGoogleEarth => 'Mở bằng Google Earth';
+
+  @override
+  String get utmZone => 'UTM Zone';
+
+  @override
+  String get hemisphere => 'Bán cầu';
+
+  @override
+  String get north => 'Bắc (North)';
+
+  @override
+  String get south => 'Nam (South)';
+
+  @override
+  String get cancel => 'Hủy';
+
+  @override
+  String get createLayer => 'Tạo layer';
+
+  @override
+  String get coordinateSystem => 'Hệ tọa độ';
+
+  @override
+  String get localCadUndefined => 'CAD cục bộ / chưa xác định';
+
+  @override
+  String get sourceCrsDeclarationNote =>
+      'Lưu ý: thao tác này chỉ khai báo CRS của layer, không tự thay đổi các giá trị tọa độ X/Y đang có.';
+
+  @override
+  String get apply => 'Áp dụng';
 }

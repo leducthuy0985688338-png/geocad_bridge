@@ -183,4 +183,115 @@ class AppLocalizationsLo extends AppLocalizations {
 
   @override
   String get unlockLayer => 'ປົດລັອກຊັ້ນ';
+
+  @override
+  String get projectOpenedWithWarnings => 'ເປີດໂຄງການແລ້ວໂດຍມີຄຳເຕືອນ';
+
+  @override
+  String get geometryRestoredMissingSources =>
+      'ໄດ້ກູ້ຄືນ Geometry ແລ້ວ. ບາງໄຟລ໌ຕົ້ນທາງບໍ່ມີຢູ່ແລ້ວ:';
+
+  @override
+  String get close => 'ປິດ';
+
+  @override
+  String get googleEarthImportResult => 'ຜົນການນຳເຂົ້າ Google Earth';
+
+  @override
+  String googleEarthFilesImported(int count) {
+    return 'ເພີ່ມສຳເລັດ: $count ໄຟລ໌ KML';
+  }
+
+  @override
+  String googleEarthFilesSkipped(int count) {
+    return 'ຂ້າມ: $count ໄຟລ໌ທີ່ມີຢູ່ແລ້ວໃນໂຄງການ';
+  }
+
+  @override
+  String get unreadableFiles => 'ໄຟລ໌ທີ່ບໍ່ສາມາດອ່ານໄດ້:';
+
+  @override
+  String get dxfImportResult => 'ຜົນການນຳເຂົ້າ DXF';
+
+  @override
+  String dxfLayersImported(int count) {
+    return 'ເພີ່ມແລ້ວ: $count ຊັ້ນ DXF';
+  }
+
+  @override
+  String dxfEntitiesImported(int count) {
+    return 'ນຳເຂົ້າແລ້ວ: $count entity';
+  }
+
+  @override
+  String dxfMalformedSkipped(int count) {
+    return 'ຂ້າມ entity ທີ່ບໍ່ສົມບູນ: $count';
+  }
+
+  @override
+  String dxfUnsupportedEntities(int count) {
+    return 'Entity ທີ່ຍັງບໍ່ຮອງຮັບ: $count';
+  }
+
+  @override
+  String get dxfFidelityWarnings => 'ຄຳເຕືອນ fidelity:';
+
+  @override
+  String get cadImportResult => 'ຜົນການນຳເຂົ້າແບບ';
+
+  @override
+  String cadFilesImported(int count) {
+    return 'ເພີ່ມສຳເລັດ: $count ໄຟລ໌';
+  }
+
+  @override
+  String get kmlExportUnavailable => 'ຍັງບໍ່ສາມາດສົ່ງອອກ KML';
+
+  @override
+  String get kmlRequiresWgs84 =>
+      'KML ຕ້ອງໃຊ້ WGS84 (EPSG:4326). ຊັ້ນທີ່ກຳລັງສະແດງຕໍ່ໄປນີ້ຍັງບໍ່ແມ່ນ WGS84:';
+
+  @override
+  String get kmlPrepareWgs84Hint =>
+      'ກຳນົດ/ອ້າງອີງ CRS, ສ້າງຊັ້ນ WGS84 ແລ້ວເຊື່ອງຊັ້ນຕົ້ນທາງກ່ອນສົ່ງອອກ.';
+
+  @override
+  String get understood => 'ເຂົ້າໃຈແລ້ວ';
+
+  @override
+  String get kmlExportSucceeded => 'ສົ່ງອອກ KML ສຳເລັດ';
+
+  @override
+  String get openWithGoogleEarth => 'ເປີດດ້ວຍ Google Earth';
+
+  @override
+  String get utmZone => 'UTM Zone';
+
+  @override
+  String get hemisphere => 'ຊີກໂລກ';
+
+  @override
+  String get north => 'ເໜືອ';
+
+  @override
+  String get south => 'ໃຕ້';
+
+  @override
+  String get cancel => 'ຍົກເລີກ';
+
+  @override
+  String get createLayer => 'ສ້າງຊັ້ນ';
+
+  @override
+  String get coordinateSystem => 'ລະບົບພິກັດ';
+
+  @override
+  String get localCadUndefined => 'CAD ທ້ອງຖິ່ນ / ຍັງບໍ່ກຳນົດ';
+
+  @override
+  String get sourceCrsDeclarationNote =>
+      'ໝາຍເຫດ: ການດຳເນີນການນີ້ພຽງແຕ່ກຳນົດ CRS ຂອງຊັ້ນ ແລະ ບໍ່ໄດ້ປ່ຽນຄ່າພິກັດ X/Y ທີ່ມີຢູ່.';
+
+  @override
+  String get apply => 'ນຳໃຊ້';
 }

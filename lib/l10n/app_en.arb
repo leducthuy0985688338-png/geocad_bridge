@@ -88,5 +88,85 @@
                                                                  "type":  "int"
                                                              }
                                                }
-                          }
+                          },
+    "projectOpenedWithWarnings":  "Project opened with warnings",
+    "geometryRestoredMissingSources":  "Geometry was restored. Some source files no longer exist:",
+    "close":  "Close",
+    "googleEarthImportResult":  "Google Earth import result",
+    "googleEarthFilesImported":  "Successfully added: {count} KML files",
+    "@googleEarthFilesImported":  {
+                                      "placeholders":  {
+                                                           "count":  {
+                                                                         "type":  "int"
+                                                                     }
+                                                       }
+                                  },
+    "googleEarthFilesSkipped":  "Skipped: {count} files already in the project",
+    "@googleEarthFilesSkipped":  {
+                                     "placeholders":  {
+                                                          "count":  {
+                                                                        "type":  "int"
+                                                                    }
+                                                      }
+                                 },
+    "unreadableFiles":  "Files that could not be read:",
+    "dxfImportResult":  "DXF import result",
+    "dxfLayersImported":  "Added: {count} DXF layers",
+    "@dxfLayersImported":  {
+                               "placeholders":  {
+                                                    "count":  {
+                                                                  "type":  "int"
+                                                              }
+                                                }
+                           },
+    "dxfEntitiesImported":  "Imported: {count} entities",
+    "@dxfEntitiesImported":  {
+                                 "placeholders":  {
+                                                      "count":  {
+                                                                    "type":  "int"
+                                                                }
+                                                  }
+                             },
+    "dxfMalformedSkipped":  "Malformed entities skipped: {count}",
+    "@dxfMalformedSkipped":  {
+                                 "placeholders":  {
+                                                      "count":  {
+                                                                    "type":  "int"
+                                                                }
+                                                  }
+                             },
+    "dxfUnsupportedEntities":  "Unsupported entities: {count}",
+    "@dxfUnsupportedEntities":  {
+                                    "placeholders":  {
+                                                         "count":  {
+                                                                       "type":  "int"
+                                                                   }
+                                                     }
+                                },
+    "dxfFidelityWarnings":  "Fidelity warnings:",
+    "cadImportResult":  "Drawing import result",
+    "cadFilesImported":  "Successfully added: {count} files",
+    "@cadFilesImported":  {
+                              "placeholders":  {
+                                                   "count":  {
+                                                                 "type":  "int"
+                                                             }
+                                               }
+                          },
+    "kmlExportUnavailable":  "Cannot export KML",
+    "kmlRequiresWgs84":  "KML requires WGS84 (EPSG:4326). The following visible layers are not WGS84:",
+    "kmlPrepareWgs84Hint":  "Assign/georeference the CRS, create a WGS84 layer, then hide the source layer before exporting.",
+    "understood":  "Got it",
+    "kmlExportSucceeded":  "KML exported successfully",
+    "openWithGoogleEarth":  "Open with Google Earth",
+    "utmZone":  "UTM Zone",
+    "hemisphere":  "Hemisphere",
+    "north":  "North",
+    "south":  "South",
+    "cancel":  "Cancel",
+    "createLayer":  "Create layer",
+    "coordinateSystem":  "Coordinate system",
+    "localCadUndefined":  "Local CAD / undefined",
+    "sourceCrsDeclarationNote":  "Note: this action only declares the layer CRS; it does not modify the existing X/Y coordinate values.",
+    "apply":  "Apply"
 }

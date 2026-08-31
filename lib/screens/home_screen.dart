@@ -311,10 +311,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _showProjectWarnings(List<String> warnings) async {
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Project đã mở với cảnh báo'),
+        title: Text(l10n.projectOpenedWithWarnings),
         content: SizedBox(
           width: 600,
           child: SingleChildScrollView(
@@ -322,9 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Geometry đã được khôi phục. Một số file nguồn không còn tồn tại:',
-                ),
+                Text(l10n.geometryRestoredMissingSources),
                 const SizedBox(height: 12),
                 for (final warning in warnings)
                   Padding(
@@ -338,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Đóng'),
+            child: Text(l10n.close),
           ),
         ],
       ),
@@ -546,12 +545,13 @@ class _HomeScreenState extends State<HomeScreen> {
     required List<String> errors,
   }) {
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
 
     showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Kết quả nhập Google Earth'),
+          title: Text(l10n.googleEarthImportResult),
           content: SizedBox(
             width: 560,
             child: SingleChildScrollView(
@@ -559,21 +559,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Đã thêm thành công: '
-                    '$importedCount file KML',
-                  ),
+                  Text(l10n.googleEarthFilesImported(importedCount)),
                   if (skippedCount > 0) ...[
                     const SizedBox(height: 6),
-                    Text(
-                      'Đã bỏ qua: $skippedCount file '
-                      'đang có trong dự án',
-                    ),
+                    Text(l10n.googleEarthFilesSkipped(skippedCount)),
                   ],
                   const SizedBox(height: 16),
-                  const Text(
-                    'Các file không đọc được:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  Text(
+                    l10n.unreadableFiles,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   ...errors.map(
@@ -591,7 +585,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('Đóng'),
+              child: Text(l10n.close),
             ),
           ],
         );
@@ -610,10 +604,11 @@ class _HomeScreenState extends State<HomeScreen> {
     required List<String> errors,
   }) async {
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Kết quả nhập DXF'),
+        title: Text(l10n.dxfImportResult),
         content: SizedBox(
           width: 600,
           child: SingleChildScrollView(
@@ -621,7 +616,7 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Đã thêm: $importedLayerCount layer DXF'),
+                Text(l10n.dxfLayersImported(importedLayerCount)),
                 const SizedBox(height: 12),
                 for (final summary in summaries) ...[
                   Text(
@@ -629,23 +624,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    'Đã nhập: '
-                    '${summary.diagnostics.parsedEntityCount} entity',
+                    l10n.dxfEntitiesImported(
+                      summary.diagnostics.parsedEntityCount,
+                    ),
                   ),
                   Text(
-                    'Malformed đã bỏ qua: '
-                    '${summary.diagnostics.malformedEntityCount}',
+                    l10n.dxfMalformedSkipped(
+                      summary.diagnostics.malformedEntityCount,
+                    ),
                   ),
                   Text(
-                    'Entity chưa hỗ trợ: '
-                    '${summary.diagnostics.unsupportedEntityCount}',
+                    l10n.dxfUnsupportedEntities(
+                      summary.diagnostics.unsupportedEntityCount,
+                    ),
                   ),
                   for (final entry
                       in summary.diagnostics.unsupportedEntityCounts.entries)
                     Text('  • ${entry.key}: ${entry.value}'),
                   if (summary.diagnostics.hasFidelityWarnings) ...[
                     const SizedBox(height: 4),
-                    const Text('Cảnh báo fidelity:'),
+                    Text(l10n.dxfFidelityWarnings),
                     for (final entry in _aggregateDxfWarnings(
                       summary.diagnostics,
                     ).entries)
@@ -654,9 +652,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 12),
                 ],
                 if (errors.isNotEmpty) ...[
-                  const Text(
-                    'Các file không đọc được:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  Text(
+                    l10n.unreadableFiles,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   for (final error in errors) Text('• $error'),
                 ],
@@ -667,7 +665,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Đóng'),
+            child: Text(l10n.close),
           ),
         ],
       ),
@@ -890,12 +888,13 @@ class _HomeScreenState extends State<HomeScreen> {
     required List<String> errors,
   }) {
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
 
     showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Kết quả nhập bản vẽ'),
+          title: Text(l10n.cadImportResult),
           content: SizedBox(
             width: 520,
             child: SingleChildScrollView(
@@ -903,11 +902,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Đã thêm thành công: $importedCount file'),
+                  Text(l10n.cadFilesImported(importedCount)),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Các file không đọc được:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  Text(
+                    l10n.unreadableFiles,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   ...errors.map(
@@ -925,7 +924,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('Đóng'),
+              child: Text(l10n.close),
             ),
           ],
         );
@@ -1179,11 +1178,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showInvalidKmlCrsDialog(List<MapLayer> invalidLayers) async {
+    final l10n = AppLocalizations.of(context);
     await showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Chưa thể xuất KML'),
+          title: Text(l10n.kmlExportUnavailable),
           content: SizedBox(
             width: 520,
             child: SingleChildScrollView(
@@ -1191,10 +1191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'KML yêu cầu WGS84 (EPSG:4326). '
-                    'Các layer đang hiển thị sau chưa phải WGS84:',
-                  ),
+                  Text(l10n.kmlRequiresWgs84),
                   const SizedBox(height: 12),
                   ...invalidLayers.map(
                     (layer) => Padding(
@@ -1203,10 +1200,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Hãy gán/định vị CRS, tạo layer WGS84, '
-                    'sau đó ẩn layer nguồn trước khi xuất.',
-                  ),
+                  Text(l10n.kmlPrepareWgs84Hint),
                 ],
               ),
             ),
@@ -1214,7 +1208,7 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Đã hiểu'),
+              child: Text(l10n.understood),
             ),
           ],
         );
@@ -1223,6 +1217,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showKmlExportSuccessDialog(Uri outputUri) async {
+    final l10n = AppLocalizations.of(context);
     await showDialog<void>(
       context: context,
       builder: (context) {
@@ -1231,12 +1226,12 @@ class _HomeScreenState extends State<HomeScreen> {
             : outputUri.toString();
 
         return AlertDialog(
-          title: const Text('Xuất KML thành công'),
+          title: Text(l10n.kmlExportSucceeded),
           content: SizedBox(width: 520, child: SelectableText(displayPath)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Đóng'),
+              child: Text(l10n.close),
             ),
             FilledButton.icon(
               onPressed: outputUri.scheme == 'file' && Platform.isWindows
@@ -1246,7 +1241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                   : null,
               icon: const Icon(Icons.public),
-              label: const Text('Mở bằng Google Earth'),
+              label: Text(l10n.openWithGoogleEarth),
             ),
           ],
         );
@@ -1652,6 +1647,7 @@ class _LeftPanel extends StatelessWidget {
 Future<CoordinateReferenceSystem?> _showUtmTargetDialog(
   BuildContext context,
 ) async {
+  final l10n = AppLocalizations.of(context);
   var zone = 48;
   var hemisphere = UtmHemisphere.north;
 
@@ -1661,7 +1657,7 @@ Future<CoordinateReferenceSystem?> _showUtmTargetDialog(
       return StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Tạo layer UTM'),
+            title: Text(l10n.createUtmLayer),
             content: SizedBox(
               width: 480,
               child: Row(
@@ -1669,9 +1665,9 @@ Future<CoordinateReferenceSystem?> _showUtmTargetDialog(
                   Expanded(
                     child: DropdownButtonFormField<int>(
                       initialValue: zone,
-                      decoration: const InputDecoration(
-                        labelText: 'UTM Zone',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n.utmZone,
+                        border: const OutlineInputBorder(),
                       ),
                       items: List.generate(
                         60,
@@ -1691,18 +1687,18 @@ Future<CoordinateReferenceSystem?> _showUtmTargetDialog(
                   Expanded(
                     child: DropdownButtonFormField<UtmHemisphere>(
                       initialValue: hemisphere,
-                      decoration: const InputDecoration(
-                        labelText: 'Bán cầu',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n.hemisphere,
+                        border: const OutlineInputBorder(),
                       ),
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: UtmHemisphere.north,
-                          child: Text('Bắc (North)'),
+                          child: Text(l10n.north),
                         ),
                         DropdownMenuItem(
                           value: UtmHemisphere.south,
-                          child: Text('Nam (South)'),
+                          child: Text(l10n.south),
                         ),
                       ],
                       onChanged: (value) {
@@ -1718,7 +1714,7 @@ Future<CoordinateReferenceSystem?> _showUtmTargetDialog(
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Hủy'),
+                child: Text(l10n.cancel),
               ),
               FilledButton(
                 onPressed: () {
@@ -1729,7 +1725,7 @@ Future<CoordinateReferenceSystem?> _showUtmTargetDialog(
                     ),
                   );
                 },
-                child: const Text('Tạo layer'),
+                child: Text(l10n.createLayer),
               ),
             ],
           );
@@ -1743,6 +1739,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
   BuildContext context,
   MapLayer layer,
 ) async {
+  final l10n = AppLocalizations.of(context);
   var type = layer.crs.type;
   var zone = layer.crs.utmZone ?? 48;
   var hemisphere = layer.crs.hemisphere ?? UtmHemisphere.north;
@@ -1767,7 +1764,7 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
           }
 
           return AlertDialog(
-            title: const Text('Gán hệ tọa độ nguồn'),
+            title: Text(l10n.assignSourceCrs),
             content: SizedBox(
               width: 520,
               child: SingleChildScrollView(
@@ -1784,14 +1781,14 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                     const SizedBox(height: 18),
                     DropdownButtonFormField<CoordinateReferenceSystemType>(
                       initialValue: type,
-                      decoration: const InputDecoration(
-                        labelText: 'Hệ tọa độ',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n.coordinateSystem,
+                        border: const OutlineInputBorder(),
                       ),
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: CoordinateReferenceSystemType.localCad,
-                          child: Text('CAD cục bộ / chưa xác định'),
+                          child: Text(l10n.localCadUndefined),
                         ),
                         DropdownMenuItem(
                           value: CoordinateReferenceSystemType.wgs84,
@@ -1817,9 +1814,9 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                           Expanded(
                             child: DropdownButtonFormField<int>(
                               initialValue: zone,
-                              decoration: const InputDecoration(
-                                labelText: 'UTM Zone',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                                labelText: l10n.utmZone,
+                                border: const OutlineInputBorder(),
                               ),
                               items: List.generate(
                                 60,
@@ -1841,18 +1838,18 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                           Expanded(
                             child: DropdownButtonFormField<UtmHemisphere>(
                               initialValue: hemisphere,
-                              decoration: const InputDecoration(
-                                labelText: 'Bán cầu',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                                labelText: l10n.hemisphere,
+                                border: const OutlineInputBorder(),
                               ),
-                              items: const [
+                              items: [
                                 DropdownMenuItem(
                                   value: UtmHemisphere.north,
-                                  child: Text('Bắc (North)'),
+                                  child: Text(l10n.north),
                                 ),
                                 DropdownMenuItem(
                                   value: UtmHemisphere.south,
-                                  child: Text('Nam (South)'),
+                                  child: Text(l10n.south),
                                 ),
                               ],
                               onChanged: (value) {
@@ -1907,11 +1904,9 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Lưu ý: thao tác này chỉ khai báo CRS '
-                      'của layer, không tự thay đổi các giá trị '
-                      'tọa độ X/Y đang có.',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    Text(
+                      l10n.sourceCrsDeclarationNote,
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
                 ),
@@ -1922,14 +1917,14 @@ Future<CoordinateReferenceSystem?> _showLayerCrsDialog(
                 onPressed: () {
                   Navigator.of(context).pop();
                 },
-                child: const Text('Hủy'),
+                child: Text(l10n.cancel),
               ),
               FilledButton.icon(
                 onPressed: () {
                   Navigator.of(context).pop(preview);
                 },
                 icon: const Icon(Icons.check),
-                label: const Text('Áp dụng'),
+                label: Text(l10n.apply),
               ),
             ],
           );

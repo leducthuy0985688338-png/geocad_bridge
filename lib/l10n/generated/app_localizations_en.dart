@@ -183,4 +183,115 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unlockLayer => 'Unlock layer';
+
+  @override
+  String get projectOpenedWithWarnings => 'Project opened with warnings';
+
+  @override
+  String get geometryRestoredMissingSources =>
+      'Geometry was restored. Some source files no longer exist:';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get googleEarthImportResult => 'Google Earth import result';
+
+  @override
+  String googleEarthFilesImported(int count) {
+    return 'Successfully added: $count KML files';
+  }
+
+  @override
+  String googleEarthFilesSkipped(int count) {
+    return 'Skipped: $count files already in the project';
+  }
+
+  @override
+  String get unreadableFiles => 'Files that could not be read:';
+
+  @override
+  String get dxfImportResult => 'DXF import result';
+
+  @override
+  String dxfLayersImported(int count) {
+    return 'Added: $count DXF layers';
+  }
+
+  @override
+  String dxfEntitiesImported(int count) {
+    return 'Imported: $count entities';
+  }
+
+  @override
+  String dxfMalformedSkipped(int count) {
+    return 'Malformed entities skipped: $count';
+  }
+
+  @override
+  String dxfUnsupportedEntities(int count) {
+    return 'Unsupported entities: $count';
+  }
+
+  @override
+  String get dxfFidelityWarnings => 'Fidelity warnings:';
+
+  @override
+  String get cadImportResult => 'Drawing import result';
+
+  @override
+  String cadFilesImported(int count) {
+    return 'Successfully added: $count files';
+  }
+
+  @override
+  String get kmlExportUnavailable => 'Cannot export KML';
+
+  @override
+  String get kmlRequiresWgs84 =>
+      'KML requires WGS84 (EPSG:4326). The following visible layers are not WGS84:';
+
+  @override
+  String get kmlPrepareWgs84Hint =>
+      'Assign/georeference the CRS, create a WGS84 layer, then hide the source layer before exporting.';
+
+  @override
+  String get understood => 'Got it';
+
+  @override
+  String get kmlExportSucceeded => 'KML exported successfully';
+
+  @override
+  String get openWithGoogleEarth => 'Open with Google Earth';
+
+  @override
+  String get utmZone => 'UTM Zone';
+
+  @override
+  String get hemisphere => 'Hemisphere';
+
+  @override
+  String get north => 'North';
+
+  @override
+  String get south => 'South';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get createLayer => 'Create layer';
+
+  @override
+  String get coordinateSystem => 'Coordinate system';
+
+  @override
+  String get localCadUndefined => 'Local CAD / undefined';
+
+  @override
+  String get sourceCrsDeclarationNote =>
+      'Note: this action only declares the layer CRS; it does not modify the existing X/Y coordinate values.';
+
+  @override
+  String get apply => 'Apply';
 }

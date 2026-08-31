@@ -429,6 +429,192 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Mở khóa layer'**
   String get unlockLayer;
+
+  /// No description provided for @projectOpenedWithWarnings.
+  ///
+  /// In vi, this message translates to:
+  /// **'Project đã mở với cảnh báo'**
+  String get projectOpenedWithWarnings;
+
+  /// No description provided for @geometryRestoredMissingSources.
+  ///
+  /// In vi, this message translates to:
+  /// **'Geometry đã được khôi phục. Một số file nguồn không còn tồn tại:'**
+  String get geometryRestoredMissingSources;
+
+  /// No description provided for @close.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đóng'**
+  String get close;
+
+  /// No description provided for @googleEarthImportResult.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả nhập Google Earth'**
+  String get googleEarthImportResult;
+
+  /// No description provided for @googleEarthFilesImported.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã thêm thành công: {count} file KML'**
+  String googleEarthFilesImported(int count);
+
+  /// No description provided for @googleEarthFilesSkipped.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã bỏ qua: {count} file đang có trong dự án'**
+  String googleEarthFilesSkipped(int count);
+
+  /// No description provided for @unreadableFiles.
+  ///
+  /// In vi, this message translates to:
+  /// **'Các file không đọc được:'**
+  String get unreadableFiles;
+
+  /// No description provided for @dxfImportResult.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả nhập DXF'**
+  String get dxfImportResult;
+
+  /// No description provided for @dxfLayersImported.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã thêm: {count} layer DXF'**
+  String dxfLayersImported(int count);
+
+  /// No description provided for @dxfEntitiesImported.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã nhập: {count} entity'**
+  String dxfEntitiesImported(int count);
+
+  /// No description provided for @dxfMalformedSkipped.
+  ///
+  /// In vi, this message translates to:
+  /// **'Malformed đã bỏ qua: {count}'**
+  String dxfMalformedSkipped(int count);
+
+  /// No description provided for @dxfUnsupportedEntities.
+  ///
+  /// In vi, this message translates to:
+  /// **'Entity chưa hỗ trợ: {count}'**
+  String dxfUnsupportedEntities(int count);
+
+  /// No description provided for @dxfFidelityWarnings.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cảnh báo fidelity:'**
+  String get dxfFidelityWarnings;
+
+  /// No description provided for @cadImportResult.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả nhập bản vẽ'**
+  String get cadImportResult;
+
+  /// No description provided for @cadFilesImported.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã thêm thành công: {count} file'**
+  String cadFilesImported(int count);
+
+  /// No description provided for @kmlExportUnavailable.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa thể xuất KML'**
+  String get kmlExportUnavailable;
+
+  /// No description provided for @kmlRequiresWgs84.
+  ///
+  /// In vi, this message translates to:
+  /// **'KML yêu cầu WGS84 (EPSG:4326). Các layer đang hiển thị sau chưa phải WGS84:'**
+  String get kmlRequiresWgs84;
+
+  /// No description provided for @kmlPrepareWgs84Hint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hãy gán/định vị CRS, tạo layer WGS84, sau đó ẩn layer nguồn trước khi xuất.'**
+  String get kmlPrepareWgs84Hint;
+
+  /// No description provided for @understood.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã hiểu'**
+  String get understood;
+
+  /// No description provided for @kmlExportSucceeded.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xuất KML thành công'**
+  String get kmlExportSucceeded;
+
+  /// No description provided for @openWithGoogleEarth.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mở bằng Google Earth'**
+  String get openWithGoogleEarth;
+
+  /// No description provided for @utmZone.
+  ///
+  /// In vi, this message translates to:
+  /// **'UTM Zone'**
+  String get utmZone;
+
+  /// No description provided for @hemisphere.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bán cầu'**
+  String get hemisphere;
+
+  /// No description provided for @north.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắc (North)'**
+  String get north;
+
+  /// No description provided for @south.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nam (South)'**
+  String get south;
+
+  /// No description provided for @cancel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hủy'**
+  String get cancel;
+
+  /// No description provided for @createLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tạo layer'**
+  String get createLayer;
+
+  /// No description provided for @coordinateSystem.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hệ tọa độ'**
+  String get coordinateSystem;
+
+  /// No description provided for @localCadUndefined.
+  ///
+  /// In vi, this message translates to:
+  /// **'CAD cục bộ / chưa xác định'**
+  String get localCadUndefined;
+
+  /// No description provided for @sourceCrsDeclarationNote.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lưu ý: thao tác này chỉ khai báo CRS của layer, không tự thay đổi các giá trị tọa độ X/Y đang có.'**
+  String get sourceCrsDeclarationNote;
+
+  /// No description provided for @apply.
+  ///
+  /// In vi, this message translates to:
+  /// **'Áp dụng'**
+  String get apply;
 }
 
 class _AppLocalizationsDelegate

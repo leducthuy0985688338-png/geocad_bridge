@@ -88,5 +88,85 @@
                                                                  "type":  "int"
                                                              }
                                                }
-                          }
+                          },
+    "projectOpenedWithWarnings":  "Project đã mở với cảnh báo",
+    "geometryRestoredMissingSources":  "Geometry đã được khôi phục. Một số file nguồn không còn tồn tại:",
+    "close":  "Đóng",
+    "googleEarthImportResult":  "Kết quả nhập Google Earth",
+    "googleEarthFilesImported":  "Đã thêm thành công: {count} file KML",
+    "@googleEarthFilesImported":  {
+                                      "placeholders":  {
+                                                           "count":  {
+                                                                         "type":  "int"
+                                                                     }
+                                                       }
+                                  },
+    "googleEarthFilesSkipped":  "Đã bỏ qua: {count} file đang có trong dự án",
+    "@googleEarthFilesSkipped":  {
+                                     "placeholders":  {
+                                                          "count":  {
+                                                                        "type":  "int"
+                                                                    }
+                                                      }
+                                 },
+    "unreadableFiles":  "Các file không đọc được:",
+    "dxfImportResult":  "Kết quả nhập DXF",
+    "dxfLayersImported":  "Đã thêm: {count} layer DXF",
+    "@dxfLayersImported":  {
+                               "placeholders":  {
+                                                    "count":  {
+                                                                  "type":  "int"
+                                                              }
+                                                }
+                           },
+    "dxfEntitiesImported":  "Đã nhập: {count} entity",
+    "@dxfEntitiesImported":  {
+                                 "placeholders":  {
+                                                      "count":  {
+                                                                    "type":  "int"
+                                                                }
+                                                  }
+                             },
+    "dxfMalformedSkipped":  "Malformed đã bỏ qua: {count}",
+    "@dxfMalformedSkipped":  {
+                                 "placeholders":  {
+                                                      "count":  {
+                                                                    "type":  "int"
+                                                                }
+                                                  }
+                             },
+    "dxfUnsupportedEntities":  "Entity chưa hỗ trợ: {count}",
+    "@dxfUnsupportedEntities":  {
+                                    "placeholders":  {
+                                                         "count":  {
+                                                                       "type":  "int"
+                                                                   }
+                                                     }
+                                },
+    "dxfFidelityWarnings":  "Cảnh báo fidelity:",
+    "cadImportResult":  "Kết quả nhập bản vẽ",
+    "cadFilesImported":  "Đã thêm thành công: {count} file",
+    "@cadFilesImported":  {
+                              "placeholders":  {
+                                                   "count":  {
+                                                                 "type":  "int"
+                                                             }
+                                               }
+                          },
+    "kmlExportUnavailable":  "Chưa thể xuất KML",
+    "kmlRequiresWgs84":  "KML yêu cầu WGS84 (EPSG:4326). Các layer đang hiển thị sau chưa phải WGS84:",
+    "kmlPrepareWgs84Hint":  "Hãy gán/định vị CRS, tạo layer WGS84, sau đó ẩn layer nguồn trước khi xuất.",
+    "understood":  "Đã hiểu",
+    "kmlExportSucceeded":  "Xuất KML thành công",
+    "openWithGoogleEarth":  "Mở bằng Google Earth",
+    "utmZone":  "UTM Zone",
+    "hemisphere":  "Bán cầu",
+    "north":  "Bắc (North)",
+    "south":  "Nam (South)",
+    "cancel":  "Hủy",
+    "createLayer":  "Tạo layer",
+    "coordinateSystem":  "Hệ tọa độ",
+    "localCadUndefined":  "CAD cục bộ / chưa xác định",
+    "sourceCrsDeclarationNote":  "Lưu ý: thao tác này chỉ khai báo CRS của layer, không tự thay đổi các giá trị tọa độ X/Y đang có.",
+    "apply":  "Áp dụng"
 }

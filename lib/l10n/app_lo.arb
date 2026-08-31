@@ -88,5 +88,85 @@
                                                                  "type":  "int"
                                                              }
                                                }
-                          }
+                          },
+    "projectOpenedWithWarnings":  "ເປີດໂຄງການແລ້ວໂດຍມີຄຳເຕືອນ",
+    "geometryRestoredMissingSources":  "ໄດ້ກູ້ຄືນ Geometry ແລ້ວ. ບາງໄຟລ໌ຕົ້ນທາງບໍ່ມີຢູ່ແລ້ວ:",
+    "close":  "ປິດ",
+    "googleEarthImportResult":  "ຜົນການນຳເຂົ້າ Google Earth",
+    "googleEarthFilesImported":  "ເພີ່ມສຳເລັດ: {count} ໄຟລ໌ KML",
+    "@googleEarthFilesImported":  {
+                                      "placeholders":  {
+                                                           "count":  {
+                                                                         "type":  "int"
+                                                                     }
+                                                       }
+                                  },
+    "googleEarthFilesSkipped":  "ຂ້າມ: {count} ໄຟລ໌ທີ່ມີຢູ່ແລ້ວໃນໂຄງການ",
+    "@googleEarthFilesSkipped":  {
+                                     "placeholders":  {
+                                                          "count":  {
+                                                                        "type":  "int"
+                                                                    }
+                                                      }
+                                 },
+    "unreadableFiles":  "ໄຟລ໌ທີ່ບໍ່ສາມາດອ່ານໄດ້:",
+    "dxfImportResult":  "ຜົນການນຳເຂົ້າ DXF",
+    "dxfLayersImported":  "ເພີ່ມແລ້ວ: {count} ຊັ້ນ DXF",
+    "@dxfLayersImported":  {
+                               "placeholders":  {
+                                                    "count":  {
+                                                                  "type":  "int"
+                                                              }
+                                                }
+                           },
+    "dxfEntitiesImported":  "ນຳເຂົ້າແລ້ວ: {count} entity",
+    "@dxfEntitiesImported":  {
+                                 "placeholders":  {
+                                                      "count":  {
+                                                                    "type":  "int"
+                                                                }
+                                                  }
+                             },
+    "dxfMalformedSkipped":  "ຂ້າມ entity ທີ່ບໍ່ສົມບູນ: {count}",
+    "@dxfMalformedSkipped":  {
+                                 "placeholders":  {
+                                                      "count":  {
+                                                                    "type":  "int"
+                                                                }
+                                                  }
+                             },
+    "dxfUnsupportedEntities":  "Entity ທີ່ຍັງບໍ່ຮອງຮັບ: {count}",
+    "@dxfUnsupportedEntities":  {
+                                    "placeholders":  {
+                                                         "count":  {
+                                                                       "type":  "int"
+                                                                   }
+                                                     }
+                                },
+    "dxfFidelityWarnings":  "ຄຳເຕືອນ fidelity:",
+    "cadImportResult":  "ຜົນການນຳເຂົ້າແບບ",
+    "cadFilesImported":  "ເພີ່ມສຳເລັດ: {count} ໄຟລ໌",
+    "@cadFilesImported":  {
+                              "placeholders":  {
+                                                   "count":  {
+                                                                 "type":  "int"
+                                                             }
+                                               }
+                          },
+    "kmlExportUnavailable":  "ຍັງບໍ່ສາມາດສົ່ງອອກ KML",
+    "kmlRequiresWgs84":  "KML ຕ້ອງໃຊ້ WGS84 (EPSG:4326). ຊັ້ນທີ່ກຳລັງສະແດງຕໍ່ໄປນີ້ຍັງບໍ່ແມ່ນ WGS84:",
+    "kmlPrepareWgs84Hint":  "ກຳນົດ/ອ້າງອີງ CRS, ສ້າງຊັ້ນ WGS84 ແລ້ວເຊື່ອງຊັ້ນຕົ້ນທາງກ່ອນສົ່ງອອກ.",
+    "understood":  "ເຂົ້າໃຈແລ້ວ",
+    "kmlExportSucceeded":  "ສົ່ງອອກ KML ສຳເລັດ",
+    "openWithGoogleEarth":  "ເປີດດ້ວຍ Google Earth",
+    "utmZone":  "UTM Zone",
+    "hemisphere":  "ຊີກໂລກ",
+    "north":  "ເໜືອ",
+    "south":  "ໃຕ້",
+    "cancel":  "ຍົກເລີກ",
+    "createLayer":  "ສ້າງຊັ້ນ",
+    "coordinateSystem":  "ລະບົບພິກັດ",
+    "localCadUndefined":  "CAD ທ້ອງຖິ່ນ / ຍັງບໍ່ກຳນົດ",
+    "sourceCrsDeclarationNote":  "ໝາຍເຫດ: ການດຳເນີນການນີ້ພຽງແຕ່ກຳນົດ CRS ຂອງຊັ້ນ ແລະ ບໍ່ໄດ້ປ່ຽນຄ່າພິກັດ X/Y ທີ່ມີຢູ່.",
+    "apply":  "ນຳໃຊ້"
 }
