@@ -840,4 +840,200 @@ Label
       throwsUnsupportedError,
     );
   });
+  group('DXF R12 POLYLINE / VERTEX / SEQEND', () {
+    test('parses open and closed POLYLINE as logical entities', () async {
+      final open = await parseRaw(
+        _r12PolylineDxf(0, [
+          ['100', '200', '0'],
+          ['150', '250', '0'],
+          ['300', '400', '0'],
+        ]),
+      );
+      final closed = await parseRaw(
+        _r12PolylineDxf(1, [
+          ['0', '0', '5'],
+          ['10', '0', '6'],
+          ['0', '10', '7'],
+        ]),
+      );
+      expect(open.features.single.type, MapFeatureType.polyline);
+      expect(open.features.single.coordinates, hasLength(3));
+      expect(open.features.single.properties['entityType'], 'POLYLINE');
+      expect(open.diagnostics.totalEntityCount, 1);
+      expect(open.diagnostics.parsedEntityCount, 1);
+      expect(closed.features.single.type, MapFeatureType.polygon);
+      expect(closed.features.single.coordinates.map((c) => c.z), [5, 6, 7]);
+      expect(closed.diagnostics.totalEntityCount, 1);
+    });
+
+    test('rejects non-finite VERTEX as one malformed POLYLINE', () async {
+      final result = await parseRaw(
+        _r12PolylineDxf(0, [
+          ['0', '0', '0'],
+          ['NaN', '10', '0'],
+        ]),
+      );
+      expect(result.features, isEmpty);
+      expect(result.diagnostics.totalEntityCount, 1);
+      expect(result.diagnostics.malformedEntityCount, 1);
+      expect(
+        result.diagnostics.issues.single.code,
+        DxfDiagnosticCode.nonFiniteNumber,
+      );
+      expect(result.diagnostics.issues.single.entityType, 'POLYLINE');
+    });
+
+    test('rejects POLYLINE missing SEQEND', () async {
+      final result = await parseRaw(
+        _r12PolylineDxf(0, [
+          ['0', '0', '0'],
+          ['10', '10', '0'],
+        ], includeSeqend: false),
+      );
+      expect(result.features, isEmpty);
+      expect(result.diagnostics.totalEntityCount, 1);
+      expect(result.diagnostics.malformedEntityCount, 1);
+      expect(
+        result.diagnostics.issues.single.code,
+        DxfDiagnosticCode.malformedEntity,
+      );
+      expect(result.diagnostics.issues.single.reason, contains('SEQEND'));
+    });
+
+    test('rejects open and closed POLYLINE with too few vertices', () async {
+      final open = await parseRaw(
+        _r12PolylineDxf(0, [
+          ['0', '0', '0'],
+        ]),
+      );
+      final closed = await parseRaw(
+        _r12PolylineDxf(1, [
+          ['0', '0', '0'],
+          ['10', '0', '0'],
+        ]),
+      );
+      for (final result in [open, closed]) {
+        expect(result.features, isEmpty);
+        expect(result.diagnostics.totalEntityCount, 1);
+        expect(result.diagnostics.malformedEntityCount, 1);
+        expect(
+          result.diagnostics.issues.single.code,
+          DxfDiagnosticCode.invalidGeometry,
+        );
+      }
+    });
+
+    test('rejects VERTEX missing required Y', () async {
+      final result = await parseRaw(_r12MissingYVertexDxf);
+      expect(result.features, isEmpty);
+      expect(result.diagnostics.totalEntityCount, 1);
+      expect(result.diagnostics.malformedEntityCount, 1);
+      expect(
+        result.diagnostics.issues.single.code,
+        DxfDiagnosticCode.missingRequiredValue,
+      );
+    });
+  });
 }
+
+String _r12PolylineDxf(
+  int flags,
+  List<List<String>> vertices, {
+  bool includeSeqend = true,
+}) {
+  final b = StringBuffer();
+  for (final line in [
+    '0',
+    'SECTION',
+    '2',
+    'ENTITIES',
+    '0',
+    'POLYLINE',
+    '8',
+    '0',
+    '66',
+    '1',
+    '10',
+    '0',
+    '20',
+    '0',
+    '30',
+    '0',
+    '70',
+    '$flags',
+  ]) {
+    b.writeln(line);
+  }
+  for (final v in vertices) {
+    for (final line in [
+      '0',
+      'VERTEX',
+      '8',
+      '0',
+      '10',
+      v[0],
+      '20',
+      v[1],
+      '30',
+      v[2],
+      '70',
+      '0',
+    ]) {
+      b.writeln(line);
+    }
+  }
+  if (includeSeqend) {
+    for (final line in ['0', 'SEQEND', '8', '0']) {
+      b.writeln(line);
+    }
+  }
+  for (final line in ['0', 'ENDSEC', '0', 'EOF']) {
+    b.writeln(line);
+  }
+  return b.toString();
+}
+
+final _r12MissingYVertexDxf = [
+  '0',
+  'SECTION',
+  '2',
+  'ENTITIES',
+  '0',
+  'POLYLINE',
+  '8',
+  '0',
+  '66',
+  '1',
+  '70',
+  '0',
+  '0',
+  'VERTEX',
+  '8',
+  '0',
+  '10',
+  '100',
+  '30',
+  '0',
+  '70',
+  '0',
+  '0',
+  'VERTEX',
+  '8',
+  '0',
+  '10',
+  '200',
+  '20',
+  '200',
+  '30',
+  '0',
+  '70',
+  '0',
+  '0',
+  'SEQEND',
+  '8',
+  '0',
+  '0',
+  'ENDSEC',
+  '0',
+  'EOF',
+].join('\n');

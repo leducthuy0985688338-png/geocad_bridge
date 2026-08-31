@@ -58,8 +58,13 @@ class DxfExportResult {
   Uint8List get bytes => Uint8List.fromList(utf8.encode(content));
 }
 
+/// ASCII DXF R12 exporter.
+///
+/// R12/AC1009 is deliberately used as the interoperability profile. It avoids
+/// the handle/owner/LAYOUT/OBJECTS database graph required by newer DXF
+/// versions while preserving the basic CAD geometry GeoCAD currently exports.
 class DxfExportService {
-  static const String acadVersion = 'AC1021';
+  static const String acadVersion = 'AC1009';
   static const String lineEnding = '\r\n';
   static const double _minimumTolerance = 1e-9;
 
@@ -125,7 +130,7 @@ class DxfExportService {
     }
 
     final lines = <String>[];
-    _addHeader(lines, exportedCrs);
+    _addHeader(lines);
     _addTables(lines, layerNames.values.toList());
     _pair(lines, 0, 'SECTION');
     _pair(lines, 2, 'ENTITIES');
@@ -195,6 +200,7 @@ class DxfExportService {
         );
       }
     }
+
     return first;
   }
 
@@ -228,6 +234,7 @@ class DxfExportService {
         used.add(candidate.toLowerCase());
       }
     }
+
     return result;
   }
 
@@ -263,23 +270,30 @@ class DxfExportService {
     for (final coordinate in feature.coordinates) {
       _validateCoordinate(layer, feature, coordinate);
     }
-    final lines = <String>[];
 
+    final lines = <String>[];
     switch (feature.type) {
       case MapFeatureType.point:
         _requireCount(layer, feature, exactly: 1);
-        final point = feature.coordinates.single;
-        _entityStart(lines, 'POINT', 'AcDbPoint', layerName);
-        _coordinate(lines, point, xCode: 10, yCode: 20, zCode: 30);
+        _entityStart(lines, 'POINT', layerName);
+        _coordinate(
+          lines,
+          feature.coordinates.single,
+          xCode: 10,
+          yCode: 20,
+          zCode: 30,
+          writeZeroZ: true,
+        );
       case MapFeatureType.line:
         _requireCount(layer, feature, exactly: 2);
-        _entityStart(lines, 'LINE', 'AcDbLine', layerName);
+        _entityStart(lines, 'LINE', layerName);
         _coordinate(
           lines,
           feature.coordinates[0],
           xCode: 10,
           yCode: 20,
           zCode: 30,
+          writeZeroZ: true,
         );
         _coordinate(
           lines,
@@ -287,16 +301,21 @@ class DxfExportService {
           xCode: 11,
           yCode: 21,
           zCode: 31,
+          writeZeroZ: true,
         );
       case MapFeatureType.polyline:
         _requireCount(layer, feature, minimum: 2);
         _rejectPolylineElevation(layer, feature);
-        _lwPolyline(lines, feature.coordinates, layerName, closed: false);
+        _polyline(lines, feature.coordinates, layerName, closed: false);
       case MapFeatureType.polygon:
         _requireCount(layer, feature, minimum: 3);
         _rejectPolylineElevation(layer, feature);
-        final coordinates = _canonicalPolygon(layer, feature);
-        _lwPolyline(lines, coordinates, layerName, closed: true);
+        _polyline(
+          lines,
+          _canonicalPolygon(layer, feature),
+          layerName,
+          closed: true,
+        );
       case MapFeatureType.text:
         _requireCount(layer, feature, exactly: 1);
         _text(
@@ -308,34 +327,37 @@ class DxfExportService {
           warnings: warnings,
         );
     }
+
     return lines.join(lineEnding);
   }
 
-  void _entityStart(
-    List<String> lines,
-    String entity,
-    String subclass,
-    String layerName,
-  ) {
+  void _entityStart(List<String> lines, String entity, String layerName) {
     _pair(lines, 0, entity);
-    _pair(lines, 100, 'AcDbEntity');
     _pair(lines, 8, layerName);
-    _pair(lines, 100, subclass);
   }
 
-  void _lwPolyline(
+  void _polyline(
     List<String> lines,
     List<MapCoordinate> coordinates,
     String layerName, {
     required bool closed,
   }) {
-    _entityStart(lines, 'LWPOLYLINE', 'AcDbPolyline', layerName);
-    _pair(lines, 90, coordinates.length);
+    _entityStart(lines, 'POLYLINE', layerName);
+    _pair(lines, 66, 1);
+    _pair(lines, 10, '0');
+    _pair(lines, 20, '0');
+    _pair(lines, 30, '0');
     _pair(lines, 70, closed ? 1 : 0);
+
     for (final coordinate in coordinates) {
+      _entityStart(lines, 'VERTEX', layerName);
       _pair(lines, 10, _number(coordinate.x));
       _pair(lines, 20, _number(coordinate.y));
+      _pair(lines, 30, '0');
+      _pair(lines, 70, 0);
     }
+
+    _entityStart(lines, 'SEQEND', layerName);
   }
 
   void _text(
@@ -366,6 +388,7 @@ class DxfExportService {
         feature,
       );
     }
+
     final normalized = content.replaceAll(RegExp(r'\r\n?|\n'), ' ');
     if (normalized != content) {
       warnings.add('TEXT "${feature.id}" đã được chuyển thành một dòng.');
@@ -385,19 +408,20 @@ class DxfExportService {
       key: 'rotationDegrees',
       fallback: 0,
     );
-    _entityStart(lines, 'TEXT', 'AcDbText', layerName);
+
+    _entityStart(lines, 'TEXT', layerName);
     _coordinate(
       lines,
       feature.coordinates.single,
       xCode: 10,
       yCode: 20,
       zCode: 30,
+      writeZeroZ: true,
     );
     _pair(lines, 40, _number(height));
     _pair(lines, 1, content);
     _pair(lines, 50, _number(rotation));
     _pair(lines, 7, 'STANDARD');
-    _pair(lines, 100, 'AcDbText');
   }
 
   double _textNumber(
@@ -427,12 +451,14 @@ class DxfExportService {
     if (_samePoint(coordinates.first, coordinates.last, tolerance)) {
       coordinates.removeLast();
     }
+
     final distinct = <MapCoordinate>[];
     for (final coordinate in coordinates) {
       if (!distinct.any((item) => _samePoint(item, coordinate, tolerance))) {
         distinct.add(coordinate);
       }
     }
+
     if (distinct.length < 3 || coordinates.length < 3) {
       throw _featureError(
         DxfExportErrorCode.invalidGeometry,
@@ -441,12 +467,14 @@ class DxfExportService {
         feature,
       );
     }
+
     var twiceArea = 0.0;
     for (var index = 0; index < coordinates.length; index++) {
       final current = coordinates[index];
       final next = coordinates[(index + 1) % coordinates.length];
       twiceArea += current.x * next.y - next.x * current.y;
     }
+
     if (!twiceArea.isFinite || twiceArea.abs() <= tolerance * tolerance) {
       throw _featureError(
         DxfExportErrorCode.invalidGeometry,
@@ -455,6 +483,7 @@ class DxfExportService {
         feature,
       );
     }
+
     return coordinates;
   }
 
@@ -485,7 +514,7 @@ class DxfExportService {
     if (feature.coordinates.any((coordinate) => coordinate.z != null)) {
       throw _featureError(
         DxfExportErrorCode.unsupportedElevation,
-        'DXF v1 không hỗ trợ Z cho LWPOLYLINE/POLYGON.',
+        'DXF R12 hiện chưa hỗ trợ Z cho POLYLINE/POLYGON.',
         layer,
         feature,
       );
@@ -526,6 +555,7 @@ class DxfExportService {
         feature,
       );
     }
+
     final zone = layer.crs.utmZone;
     if (layer.crs.isUtm &&
         (zone == null ||
@@ -563,11 +593,12 @@ class DxfExportService {
     required int xCode,
     required int yCode,
     required int zCode,
+    bool writeZeroZ = false,
   }) {
     _pair(lines, xCode, _number(coordinate.x));
     _pair(lines, yCode, _number(coordinate.y));
-    if (coordinate.z != null) {
-      _pair(lines, zCode, _number(coordinate.z!));
+    if (coordinate.z != null || writeZeroZ) {
+      _pair(lines, zCode, _number(coordinate.z ?? 0));
     }
   }
 
@@ -582,45 +613,57 @@ class DxfExportService {
         .replaceFirst(RegExp(r'\.$'), '');
   }
 
-  void _addHeader(List<String> lines, CoordinateReferenceSystem exportedCrs) {
+  void _addHeader(List<String> lines) {
     _pair(lines, 0, 'SECTION');
     _pair(lines, 2, 'HEADER');
     _pair(lines, 9, r'$ACADVER');
     _pair(lines, 1, acadVersion);
-    _pair(lines, 9, r'$INSUNITS');
-    _pair(lines, 70, exportedCrs.isUtm ? 6 : 0);
     _pair(lines, 0, 'ENDSEC');
   }
 
   void _addTables(List<String> lines, List<String> layerNames) {
     _pair(lines, 0, 'SECTION');
     _pair(lines, 2, 'TABLES');
+
     _pair(lines, 0, 'TABLE');
     _pair(lines, 2, 'LTYPE');
     _pair(lines, 70, 1);
     _pair(lines, 0, 'LTYPE');
-    _pair(lines, 100, 'AcDbSymbolTableRecord');
-    _pair(lines, 100, 'AcDbLinetypeTableRecord');
     _pair(lines, 2, 'CONTINUOUS');
-    _pair(lines, 70, 0);
+    _pair(lines, 70, 64);
     _pair(lines, 3, 'Solid line');
     _pair(lines, 72, 65);
     _pair(lines, 73, 0);
     _pair(lines, 40, '0');
     _pair(lines, 0, 'ENDTAB');
+
     _pair(lines, 0, 'TABLE');
     _pair(lines, 2, 'LAYER');
     _pair(lines, 70, layerNames.length);
     for (final layerName in layerNames) {
       _pair(lines, 0, 'LAYER');
-      _pair(lines, 100, 'AcDbSymbolTableRecord');
-      _pair(lines, 100, 'AcDbLayerTableRecord');
       _pair(lines, 2, layerName);
       _pair(lines, 70, 0);
       _pair(lines, 62, 7);
       _pair(lines, 6, 'CONTINUOUS');
     }
     _pair(lines, 0, 'ENDTAB');
+
+    _pair(lines, 0, 'TABLE');
+    _pair(lines, 2, 'STYLE');
+    _pair(lines, 70, 1);
+    _pair(lines, 0, 'STYLE');
+    _pair(lines, 2, 'STANDARD');
+    _pair(lines, 70, 0);
+    _pair(lines, 40, '0');
+    _pair(lines, 41, '1');
+    _pair(lines, 50, '0');
+    _pair(lines, 71, 0);
+    _pair(lines, 42, '1');
+    _pair(lines, 3, 'txt');
+    _pair(lines, 4, '');
+    _pair(lines, 0, 'ENDTAB');
+
     _pair(lines, 0, 'ENDSEC');
   }
 

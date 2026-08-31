@@ -61,7 +61,7 @@ void main() {
     }
   }
 
-  test('writes AC1021 UTF-8 CRLF deterministic header and footer', () {
+  test('writes deterministic ASCII DXF R12 AC1009 with CRLF', () {
     final source = [
       layer([
         feature('p', MapFeatureType.point, const [
@@ -69,19 +69,112 @@ void main() {
         ]),
       ]),
     ];
-    final first = service.serialize(documentName: 'Đo đạc', layers: source);
-    final second = service.serialize(documentName: 'Đo đạc', layers: source);
+
+    final first = service.serialize(documentName: 'Test', layers: source);
+    final second = service.serialize(documentName: 'Test', layers: source);
 
     expect(first.content, second.content);
     expect(first.bytes, second.bytes);
-    expect(first.content, contains('9\r\n\$ACADVER\r\n1\r\nAC1021\r\n'));
-    expect(first.content, contains('9\r\n\$INSUNITS\r\n70\r\n0\r\n'));
-    expect(first.content.replaceAll('\r\n', ''), isNot(contains('\n')));
+    expect(first.content, contains('9\r\n\$ACADVER\r\n1\r\nAC1009\r\n'));
     expect(first.content, endsWith('0\r\nEOF\r\n'));
-    expect(first.content, contains('10\r\n0\r\n20\r\n1.25\r\n'));
+    expect(first.content.replaceAll('\r\n', ''), isNot(contains('\n')));
+    expect(first.content, isNot(contains('AcDb')));
+    expect(first.content, isNot(contains('BLOCK_RECORD')));
+    expect(first.content, isNot(contains('OBJECTS')));
+    expect(first.content, isNot(contains('CLASSES')));
   });
 
-  test('exports POINT XY Z and null Z', () {
+  test('writes only HEADER TABLES ENTITIES sections', () {
+    final result = exportFeatures([
+      feature('p', MapFeatureType.point, const [MapCoordinate(x: 1, y: 2)]),
+    ]);
+
+    expect(_sectionNames(_pairs(result.content)), [
+      'HEADER',
+      'TABLES',
+      'ENTITIES',
+    ]);
+  });
+
+  test('exports AutoCAD fixture semantic five-object set in R12 form', () {
+    final result = exportFeatures([
+      feature('p', MapFeatureType.point, const [MapCoordinate(x: 100, y: 100)]),
+      feature('polygon', MapFeatureType.polygon, const [
+        MapCoordinate(x: 400, y: 100),
+        MapCoordinate(x: 114.712311489149, y: 100),
+        MapCoordinate(x: 114.712311489149, y: 7.2048773688217),
+        MapCoordinate(x: 400, y: 7.2048773688217),
+      ]),
+      feature(
+        'text',
+        MapFeatureType.text,
+        const [MapCoordinate(x: 400, y: 350)],
+        properties: const {'text': 'GeoCAD Test 01', 'textHeight': '20'},
+      ),
+      feature('line', MapFeatureType.line, const [
+        MapCoordinate(x: 100, y: 200),
+        MapCoordinate(x: 400, y: 450),
+      ]),
+      feature('polyline', MapFeatureType.polyline, const [
+        MapCoordinate(x: 100, y: 300),
+        MapCoordinate(x: 230.580969403789, y: -24.7285180417123),
+        MapCoordinate(x: 342.507514607037, y: -303.067247791751),
+      ]),
+    ]);
+
+    expect(result.entityCount, 5);
+    expect(_recordCount(result.content, 'POINT'), 1);
+    expect(_recordCount(result.content, 'TEXT'), 1);
+    expect(_recordCount(result.content, 'LINE'), 1);
+    expect(_recordCount(result.content, 'POLYLINE'), 2);
+    expect(_recordCount(result.content, 'VERTEX'), 7);
+    expect(_recordCount(result.content, 'SEQEND'), 2);
+    expect(_recordCount(result.content, 'LWPOLYLINE'), 0);
+    expect(result.content, contains('1\r\nGeoCAD Test 01\r\n'));
+  });
+
+  test('R12 POLYLINE uses VERTEX SEQEND and closed flag', () {
+    final result = exportFeatures([
+      feature('open', MapFeatureType.polyline, const [
+        MapCoordinate(x: 0, y: 0),
+        MapCoordinate(x: 2, y: 2),
+      ]),
+      feature('closed', MapFeatureType.polygon, const [
+        MapCoordinate(x: 0, y: 0),
+        MapCoordinate(x: 3, y: 0),
+        MapCoordinate(x: 0, y: 3),
+        MapCoordinate(x: 0, y: 0),
+      ]),
+    ]);
+
+    final records = _records(_pairs(result.content));
+    final polylines = records
+        .where((record) => record.type == 'POLYLINE')
+        .toList();
+    expect(polylines, hasLength(2));
+    expect(polylines[0].value(66), '1');
+    expect(polylines[0].value(70), '0');
+    expect(polylines[1].value(66), '1');
+    expect(polylines[1].value(70), '1');
+    expect(records.where((record) => record.type == 'VERTEX'), hasLength(5));
+    expect(records.where((record) => record.type == 'SEQEND'), hasLength(2));
+  });
+
+  test('TEXT STANDARD style has matching R12 STYLE record', () {
+    final result = exportFeatures([
+      feature(
+        'text',
+        MapFeatureType.text,
+        const [MapCoordinate(x: 10, y: 20)],
+        properties: const {'text': 'GeoCAD Test'},
+      ),
+    ]);
+
+    expect(result.content, contains('0\r\nSTYLE\r\n2\r\nSTANDARD\r\n'));
+    expect(result.content, contains('7\r\nSTANDARD\r\n'));
+  });
+
+  test('exports POINT XY Z and explicit zero Z', () {
     final result = exportFeatures([
       feature('p1', MapFeatureType.point, const [
         MapCoordinate(x: 1, y: 2, z: 3),
@@ -90,8 +183,9 @@ void main() {
     ]);
 
     expect(result.entityCount, 2);
+    expect(_recordCount(result.content, 'POINT'), 2);
     expect(result.content, contains('30\r\n3\r\n'));
-    expect(RegExp(r'0\r\nPOINT\r\n').allMatches(result.content), hasLength(2));
+    expect(result.content, contains('10\r\n4\r\n20\r\n5\r\n30\r\n0\r\n'));
   });
 
   test('exports LINE with independent endpoint Z', () {
@@ -102,51 +196,31 @@ void main() {
       ]),
     ]);
 
-    expect(result.content, contains('30\r\n3\r\n'));
-    expect(result.content, contains('31\r\n6\r\n'));
-  });
-
-  test('exports open polyline and canonical closed polygon', () {
-    final result = exportFeatures([
-      feature('open', MapFeatureType.polyline, const [
-        MapCoordinate(x: 0, y: 0),
-        MapCoordinate(x: 1, y: 1),
-      ]),
-      feature('closed', MapFeatureType.polygon, const [
-        MapCoordinate(x: 0, y: 0),
-        MapCoordinate(x: 2, y: 0),
-        MapCoordinate(x: 0, y: 2),
-        MapCoordinate(x: 0, y: 0),
-      ]),
-    ]);
-
-    expect(result.content, contains('90\r\n2\r\n70\r\n0\r\n'));
-    expect(result.content, contains('90\r\n3\r\n70\r\n1\r\n'));
+    expect(result.content, contains('10\r\n1\r\n20\r\n2\r\n30\r\n3\r\n'));
+    expect(result.content, contains('11\r\n4\r\n21\r\n5\r\n31\r\n6\r\n'));
   });
 
   test('exports TEXT values defaults Unicode and multiline warning', () {
     final result = exportFeatures([
       feature(
-        'text1',
+        't1',
         MapFeatureType.text,
-        const [MapCoordinate(x: 10, y: 20, z: 30)],
-        name: 'fallback',
-        properties: const {
-          'text': 'Điểm đo\nຈຸດວັດ',
-          'textHeight': '2.5',
-          'rotationDegrees': '30',
-        },
+        const [MapCoordinate(x: 10, y: 20)],
+        name: 'Tên điểm',
+        properties: const {'textHeight': '2.5', 'rotationDegrees': '15'},
       ),
-      feature('text2', MapFeatureType.text, const [
-        MapCoordinate(x: 0, y: 0),
-      ], name: 'Default'),
+      feature(
+        't2',
+        MapFeatureType.text,
+        const [MapCoordinate(x: 30, y: 40)],
+        properties: const {'text': 'Dòng 1\nDòng 2'},
+      ),
     ]);
 
-    expect(result.content, contains('1\r\nĐiểm đo ຈຸດວັດ\r\n'));
+    expect(result.content, contains('1\r\nTên điểm\r\n'));
     expect(result.content, contains('40\r\n2.5\r\n'));
-    expect(result.content, contains('50\r\n30\r\n'));
-    expect(result.content, contains('40\r\n1\r\n'));
-    expect(result.content, contains('50\r\n0\r\n'));
+    expect(result.content, contains('50\r\n15\r\n'));
+    expect(result.content, contains('1\r\nDòng 1 Dòng 2\r\n'));
     expect(result.warnings, hasLength(1));
   });
 
@@ -158,37 +232,30 @@ void main() {
           feature(
             'a',
             MapFeatureType.point,
-            const [MapCoordinate(x: 0, y: 0)],
-            properties: const {'cadLayer': 'Road/Center'},
+            const [MapCoordinate(x: 1, y: 1)],
+            properties: const {'cadLayer': 'A/B'},
           ),
           feature(
             'b',
             MapFeatureType.point,
-            const [MapCoordinate(x: 1, y: 1)],
-            properties: const {'cadLayer': 'Road:Center'},
-          ),
-          feature(
-            'c',
-            MapFeatureType.point,
             const [MapCoordinate(x: 2, y: 2)],
-            properties: const {'cadLayer': '0'},
+            properties: const {'cadLayer': 'A\\B'},
           ),
         ], name: 'Fallback'),
       ],
     );
 
-    expect(result.layerCount, 3);
-    expect(result.content, contains('8\r\nRoad_Center\r\n'));
-    expect(result.content, contains('8\r\nRoad_Center_2\r\n'));
-    expect(result.content, contains('8\r\n0\r\n'));
+    expect(result.layerCount, 2);
+    expect(result.content, contains('2\r\nA_B\r\n'));
+    expect(result.content, contains('2\r\nA_B_2\r\n'));
   });
 
-  test('locked is exported while invisible data is intentionally excluded', () {
+  test('locked layer exports while invisible data is excluded', () {
     final result = service.serialize(
       documentName: 'Visibility',
       layers: [
         layer([
-          feature('visible', MapFeatureType.point, const [
+          feature('shown', MapFeatureType.point, const [
             MapCoordinate(x: 1, y: 1),
           ]),
           feature('hidden', MapFeatureType.point, const [
@@ -197,36 +264,41 @@ void main() {
         ], locked: true),
       ],
     );
+
     expect(result.entityCount, 1);
     expect(result.content, isNot(contains('10\r\n2\r\n20\r\n2\r\n')));
   });
 
-  test('accepts local CAD and valid UTM with correct INSUNITS', () {
-    final local = exportFeatures([
-      feature('p', MapFeatureType.point, const [MapCoordinate(x: 1, y: 2)]),
-    ]);
-    final utm = service.serialize(
-      documentName: 'UTM',
-      layers: [
-        layer(
-          [
-            feature('p', MapFeatureType.point, const [
-              MapCoordinate(x: 500000, y: 1800000),
-            ]),
-          ],
-          crs: const CoordinateReferenceSystem.utm(
-            utmZone: 48,
-            hemisphere: UtmHemisphere.north,
+  test(
+    'accepts local CAD and valid UTM without AC1021 INSUNITS dependency',
+    () {
+      final local = exportFeatures([
+        feature('p', MapFeatureType.point, const [MapCoordinate(x: 1, y: 2)]),
+      ]);
+      final utm = service.serialize(
+        documentName: 'UTM',
+        layers: [
+          layer(
+            [
+              feature('p', MapFeatureType.point, const [
+                MapCoordinate(x: 500000, y: 1800000),
+              ]),
+            ],
+            crs: const CoordinateReferenceSystem.utm(
+              utmZone: 48,
+              hemisphere: UtmHemisphere.north,
+            ),
           ),
-        ),
-      ],
-    );
-    expect(local.exportedCrs.isLocalCad, isTrue);
-    expect(utm.exportedCrs.displayName, 'UTM Zone 48N');
-    expect(utm.content, contains('9\r\n\$INSUNITS\r\n70\r\n6\r\n'));
-  });
+        ],
+      );
 
-  test('rejects empty, malformed and nonfinite geometry', () {
+      expect(local.exportedCrs.isLocalCad, isTrue);
+      expect(utm.exportedCrs.displayName, 'UTM Zone 48N');
+      expect(utm.content, isNot(contains(r'$INSUNITS')));
+    },
+  );
+
+  test('rejects empty malformed and nonfinite geometry', () {
     expect(exportError(const []).code, DxfExportErrorCode.emptyExport);
     expect(
       exportError([
@@ -284,6 +356,7 @@ void main() {
       ]).code,
       DxfExportErrorCode.invalidGeometry,
     );
+
     for (final properties in [
       const <String, String>{'text': ''},
       const <String, String>{'text': 'A', 'textHeight': '0'},
@@ -306,6 +379,7 @@ void main() {
     final pointFeature = feature('utm', MapFeatureType.point, const [
       MapCoordinate(x: 1, y: 2),
     ]);
+
     expect(
       exportError([
         layer(
@@ -318,6 +392,7 @@ void main() {
       ]).code,
       DxfExportErrorCode.unsupportedCrs,
     );
+
     expect(
       exportError([
         layer(
@@ -331,6 +406,7 @@ void main() {
       DxfExportErrorCode.invalidGeometry,
     );
   });
+
   test('rejects WGS84 mixed types and different UTM definitions', () {
     MapLayer crsLayer(String id, CoordinateReferenceSystem crs) => layer(
       [
@@ -345,6 +421,7 @@ void main() {
           .code,
       DxfExportErrorCode.unsupportedCrs,
     );
+
     expect(
       exportError([
         crsLayer('local', const CoordinateReferenceSystem.localCad()),
@@ -358,6 +435,7 @@ void main() {
       ]).code,
       DxfExportErrorCode.mixedCrs,
     );
+
     expect(
       exportError([
         crsLayer(
@@ -399,89 +477,118 @@ void main() {
     expect(sourceFeature.properties, {'cadLayer': 'Original'});
   });
 
-  test(
-    'round trips the supported semantic subset through current parser',
-    () async {
-      final source = layer([
-        feature(
-          'point',
-          MapFeatureType.point,
-          const [MapCoordinate(x: 1, y: 2, z: 3)],
-          properties: const {'cadLayer': 'POINTS'},
-        ),
-        feature(
-          'line',
-          MapFeatureType.line,
-          const [
-            MapCoordinate(x: 4, y: 5, z: 6),
-            MapCoordinate(x: 7, y: 8, z: 9),
-          ],
-          properties: const {'cadLayer': 'LINES'},
-        ),
-        feature(
-          'open',
-          MapFeatureType.polyline,
-          const [MapCoordinate(x: 0, y: 0), MapCoordinate(x: 2, y: 2)],
-          properties: const {'cadLayer': 'PATHS'},
-        ),
-        feature(
-          'polygon',
-          MapFeatureType.polygon,
-          const [
-            MapCoordinate(x: 0, y: 0),
-            MapCoordinate(x: 3, y: 0),
-            MapCoordinate(x: 0, y: 3),
-          ],
-          properties: const {'cadLayer': 'AREAS'},
-        ),
-        feature(
-          'text',
-          MapFeatureType.text,
-          const [MapCoordinate(x: 10, y: 20, z: 5)],
-          properties: const {
-            'cadLayer': 'NOTES',
-            'text': 'Điểm A',
-            'textHeight': '2.5',
-            'rotationDegrees': '15',
-          },
-        ),
-      ]);
-      final exported = service.serialize(
-        documentName: 'Round trip',
-        layers: [source],
-      );
-      final directory = await Directory.systemTemp.createTemp(
-        'geocad-dxf-export-',
-      );
-      addTearDown(() => directory.delete(recursive: true));
-      final file = File(
-        '${directory.path}${Platform.pathSeparator}roundtrip.dxf',
-      );
-      await file.writeAsBytes(exported.bytes);
-
-      final parsed = await const DxfParserService().parseFile(file.path);
-
-      expect(parsed.features.map((item) => item.type), [
-        MapFeatureType.point,
-        MapFeatureType.line,
-        MapFeatureType.polyline,
-        MapFeatureType.polygon,
+  test('current parser still round trips R12 POINT LINE and TEXT', () async {
+    final exported = exportFeatures([
+      feature('point', MapFeatureType.point, const [
+        MapCoordinate(x: 1, y: 2, z: 3),
+      ]),
+      feature('line', MapFeatureType.line, const [
+        MapCoordinate(x: 4, y: 5, z: 6),
+        MapCoordinate(x: 7, y: 8, z: 9),
+      ]),
+      feature(
+        'text',
         MapFeatureType.text,
-      ]);
-      expect(parsed.features[0].coordinates.single.z, 3);
-      expect(parsed.features[1].coordinates.last.z, 9);
-      expect(parsed.features[2].coordinates, hasLength(2));
-      expect(parsed.features[3].properties['closed'], 'true');
-      expect(parsed.features[4].name, 'Điểm A');
-      expect(parsed.features[4].properties['textHeight'], '2.5');
-      expect(parsed.features[4].properties['rotationDegrees'], '15.0');
-      expect(parsed.features.map((item) => item.properties['cadLayer']), [
-        'POINTS',
-        'LINES',
-        'PATHS',
-        'AREAS',
-        'NOTES',
-      ]);
-    },
-  );
+        const [MapCoordinate(x: 10, y: 20, z: 5)],
+        properties: const {
+          'text': 'GeoCAD',
+          'textHeight': '2.5',
+          'rotationDegrees': '15',
+        },
+      ),
+    ]);
+
+    final directory = await Directory.systemTemp.createTemp('geocad-r12-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File(
+      '${directory.path}${Platform.pathSeparator}roundtrip.dxf',
+    );
+    await file.writeAsBytes(exported.bytes);
+
+    final parsed = await const DxfParserService().parseFile(file.path);
+
+    expect(parsed.features, hasLength(3));
+    expect(parsed.features.map((item) => item.type), [
+      MapFeatureType.point,
+      MapFeatureType.line,
+      MapFeatureType.text,
+    ]);
+    expect(parsed.features[0].coordinates.single.z, 3);
+    expect(parsed.features[1].coordinates.last.z, 9);
+    expect(parsed.features[2].name, 'GeoCAD');
+  });
+}
+
+class _DxfPair {
+  final int code;
+  final String value;
+
+  const _DxfPair(this.code, this.value);
+}
+
+class _DxfRecord {
+  final String type;
+  final List<_DxfPair> pairs;
+
+  const _DxfRecord(this.type, this.pairs);
+
+  String? value(int code) {
+    for (final pair in pairs) {
+      if (pair.code == code) return pair.value;
+    }
+    return null;
+  }
+}
+
+List<_DxfPair> _pairs(String content) {
+  final lines = content.split('\r\n');
+  if (lines.isNotEmpty && lines.last.isEmpty) {
+    lines.removeLast();
+  }
+  expect(lines.length.isEven, isTrue);
+
+  final pairs = <_DxfPair>[];
+  for (var index = 0; index < lines.length; index += 2) {
+    pairs.add(_DxfPair(int.parse(lines[index]), lines[index + 1]));
+  }
+  return pairs;
+}
+
+List<String> _sectionNames(List<_DxfPair> pairs) {
+  final names = <String>[];
+  for (var index = 0; index + 1 < pairs.length; index++) {
+    if (pairs[index].code == 0 &&
+        pairs[index].value == 'SECTION' &&
+        pairs[index + 1].code == 2) {
+      names.add(pairs[index + 1].value);
+    }
+  }
+  return names;
+}
+
+List<_DxfRecord> _records(List<_DxfPair> pairs) {
+  final records = <_DxfRecord>[];
+  var index = 0;
+  while (index < pairs.length) {
+    if (pairs[index].code != 0) {
+      index++;
+      continue;
+    }
+
+    final type = pairs[index].value;
+    final recordPairs = <_DxfPair>[];
+    index++;
+    while (index < pairs.length && pairs[index].code != 0) {
+      recordPairs.add(pairs[index]);
+      index++;
+    }
+    records.add(_DxfRecord(type, recordPairs));
+  }
+  return records;
+}
+
+int _recordCount(String content, String type) {
+  return _records(_pairs(content))
+      .where((record) => record.type == type)
+      .length;
 }

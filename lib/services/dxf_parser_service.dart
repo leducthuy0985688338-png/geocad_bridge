@@ -6,12 +6,13 @@ import '../models/map_feature.dart';
 class DxfParserService {
   const DxfParserService();
 
-  /// Đọc file DXF dạng ASCII.
+  /// Äá»c file DXF dáº¡ng ASCII.
   ///
-  /// Hiện hỗ trợ chuyển các entity sau thành MapFeature:
+  /// Hiá»‡n há»— trá»£ chuyá»ƒn cÃ¡c entity sau thÃ nh MapFeature:
   /// - POINT
   /// - LINE
   /// - LWPOLYLINE
+  /// - POLYLINE / VERTEX / SEQEND (DXF R12)
   /// - CIRCLE
   /// - ARC
   /// - TEXT
@@ -20,29 +21,29 @@ class DxfParserService {
     final file = File(filePath);
 
     if (!await file.exists()) {
-      throw const DxfParserException('Không tìm thấy file DXF.');
+      throw const DxfParserException('KhÃ´ng tÃ¬m tháº¥y file DXF.');
     }
 
     final lines = await file.readAsLines();
 
     if (lines.isEmpty) {
-      throw const DxfParserException('File DXF không có dữ liệu.');
+      throw const DxfParserException('File DXF khÃ´ng cÃ³ dá»¯ liá»‡u.');
     }
 
     if (lines.length < 2) {
-      throw const DxfParserException('File DXF không đúng cấu trúc.');
+      throw const DxfParserException('File DXF khÃ´ng Ä‘Ãºng cáº¥u trÃºc.');
     }
 
     if (lines.length.isOdd) {
       throw const DxfParserException(
-        'File DXF có Group Code không đi kèm giá trị.',
+        'File DXF cÃ³ Group Code khÃ´ng Ä‘i kÃ¨m giÃ¡ trá»‹.',
       );
     }
 
     final pairs = _createPairs(lines);
 
     if (pairs.isEmpty) {
-      throw const DxfParserException('Không đọc được dữ liệu DXF.');
+      throw const DxfParserException('KhÃ´ng Ä‘á»c Ä‘Æ°á»£c dá»¯ liá»‡u DXF.');
     }
 
     final sections = _findSections(pairs);
@@ -71,7 +72,7 @@ class DxfParserService {
 
       if (code == null) {
         throw DxfParserException(
-          'Group Code không hợp lệ tại dòng ${index + 1}: '
+          'Group Code khÃ´ng há»£p lá»‡ táº¡i dÃ²ng ${index + 1}: '
           '$codeText',
         );
       }
@@ -122,7 +123,9 @@ class DxfParserService {
       if (value == 'ENDSEC') return;
       if (value == 'SECTION' || value == 'EOF') break;
     }
-    throw const DxfParserException('SECTION ENTITIES không có ENDSEC hợp lệ.');
+    throw const DxfParserException(
+      'SECTION ENTITIES khÃ´ng cÃ³ ENDSEC há»£p lá»‡.',
+    );
   }
 
   _DxfEntitiesParseResult _parseEntities(List<DxfGroupPair> pairs) {
@@ -155,6 +158,24 @@ class DxfParserService {
       final entityType = pair.value.toUpperCase();
       entityIndex++;
 
+      if (entityType == 'POLYLINE') {
+        final polylineResult = _parseR12PolylineEntity(
+          entityPairs,
+          startIndex: index,
+          featureIndex: featureIndex,
+          entityIndex: entityIndex,
+        );
+        issues.addAll(polylineResult.issues);
+        if (polylineResult.feature == null) {
+          malformedCount++;
+        } else {
+          features.add(polylineResult.feature!);
+          featureIndex++;
+        }
+        index = polylineResult.nextIndex;
+        continue;
+      }
+
       final nextEntityIndex = _findNextEntityIndex(entityPairs, index + 1);
 
       final entityData = entityPairs.sublist(index + 1, nextEntityIndex);
@@ -174,7 +195,7 @@ class DxfParserService {
             entityType: entityType,
             entityIndex: entityIndex,
             layerName: _readString(entityData, 8),
-            reason: 'Entity $entityType chưa được hỗ trợ.',
+            reason: 'Entity $entityType chÆ°a Ä‘Æ°á»£c há»— trá»£.',
           ),
         );
         index = nextEntityIndex;
@@ -237,8 +258,8 @@ class DxfParserService {
             entityIndex: entityIndex,
             layerName: _readString(entityData, 8),
             reason: feature == null
-                ? 'Không thể tạo geometry $entityType hợp lệ.'
-                : 'Geometry $entityType tạo ra tọa độ không hữu hạn.',
+                ? 'KhÃ´ng thá»ƒ táº¡o geometry $entityType há»£p lá»‡.'
+                : 'Geometry $entityType táº¡o ra tá»a Ä‘á»™ khÃ´ng há»¯u háº¡n.',
           ),
         );
         index = nextEntityIndex;
@@ -271,6 +292,7 @@ class DxfParserService {
     'POINT',
     'LINE',
     'LWPOLYLINE',
+    'POLYLINE',
     'CIRCLE',
     'ARC',
     'TEXT',
@@ -328,7 +350,7 @@ class DxfParserService {
         if (required) {
           malformed(
             DxfDiagnosticCode.missingRequiredValue,
-            'Thiếu Group Code $code bắt buộc của $entityType.',
+            'Thiáº¿u Group Code $code báº¯t buá»™c cá»§a $entityType.',
             groupCode: code,
           );
         }
@@ -339,7 +361,7 @@ class DxfParserService {
         if (value == null) {
           malformed(
             DxfDiagnosticCode.invalidNumber,
-            'Group Code $code của $entityType không phải số hợp lệ.',
+            'Group Code $code cá»§a $entityType khÃ´ng pháº£i sá»‘ há»£p lá»‡.',
             groupCode: code,
           );
           return false;
@@ -347,7 +369,7 @@ class DxfParserService {
         if (!value.isFinite) {
           malformed(
             DxfDiagnosticCode.nonFiniteNumber,
-            'Group Code $code của $entityType phải là số hữu hạn.',
+            'Group Code $code cá»§a $entityType pháº£i lÃ  sá»‘ há»¯u háº¡n.',
             groupCode: code,
           );
           return false;
@@ -355,7 +377,7 @@ class DxfParserService {
         if (positive && value <= 0) {
           malformed(
             DxfDiagnosticCode.invalidGeometry,
-            'Group Code $code của $entityType phải lớn hơn 0.',
+            'Group Code $code cá»§a $entityType pháº£i lá»›n hÆ¡n 0.',
             groupCode: code,
           );
           return false;
@@ -395,7 +417,7 @@ class DxfParserService {
           if (_normalizeArcSweep(start, end) == null) {
             malformed(
               DxfDiagnosticCode.invalidGeometry,
-              'ARC có góc quét không hợp lệ hoặc bằng 0.',
+              'ARC cÃ³ gÃ³c quÃ©t khÃ´ng há»£p lá»‡ hoáº·c báº±ng 0.',
             );
           }
         }
@@ -409,7 +431,7 @@ class DxfParserService {
         if (content == null || content.isEmpty) {
           malformed(
             DxfDiagnosticCode.missingRequiredValue,
-            'TEXT thiếu nội dung Group Code 1 hợp lệ.',
+            'TEXT thiáº¿u ná»™i dung Group Code 1 há»£p lá»‡.',
             groupCode: 1,
           );
         }
@@ -425,7 +447,7 @@ class DxfParserService {
         if (_cleanMText(chunks.join()).trim().isEmpty) {
           malformed(
             DxfDiagnosticCode.missingRequiredValue,
-            'MTEXT thiếu nội dung Group Code 1/3 hợp lệ.',
+            'MTEXT thiáº¿u ná»™i dung Group Code 1/3 há»£p lá»‡.',
           );
         }
     }
@@ -455,7 +477,7 @@ class DxfParserService {
         if (pendingX) {
           malformed(
             DxfDiagnosticCode.invalidGeometry,
-            'LWPOLYLINE có đỉnh X không đi kèm Y.',
+            'LWPOLYLINE cÃ³ Ä‘á»‰nh X khÃ´ng Ä‘i kÃ¨m Y.',
             groupCode: 10,
           );
           return;
@@ -466,7 +488,7 @@ class DxfParserService {
             x == null
                 ? DxfDiagnosticCode.invalidNumber
                 : DxfDiagnosticCode.nonFiniteNumber,
-            'Tọa độ X của LWPOLYLINE không hợp lệ hoặc không hữu hạn.',
+            'Tá»a Ä‘á»™ X cá»§a LWPOLYLINE khÃ´ng há»£p lá»‡ hoáº·c khÃ´ng há»¯u háº¡n.',
             groupCode: 10,
           );
           return;
@@ -476,7 +498,7 @@ class DxfParserService {
         if (!pendingX) {
           malformed(
             DxfDiagnosticCode.invalidGeometry,
-            'LWPOLYLINE có đỉnh Y không đi kèm X.',
+            'LWPOLYLINE cÃ³ Ä‘á»‰nh Y khÃ´ng Ä‘i kÃ¨m X.',
             groupCode: 20,
           );
           return;
@@ -487,7 +509,7 @@ class DxfParserService {
             y == null
                 ? DxfDiagnosticCode.invalidNumber
                 : DxfDiagnosticCode.nonFiniteNumber,
-            'Tọa độ Y của LWPOLYLINE không hợp lệ hoặc không hữu hạn.',
+            'Tá»a Ä‘á»™ Y cá»§a LWPOLYLINE khÃ´ng há»£p lá»‡ hoáº·c khÃ´ng há»¯u háº¡n.',
             groupCode: 20,
           );
           return;
@@ -499,7 +521,7 @@ class DxfParserService {
     if (pendingX) {
       malformed(
         DxfDiagnosticCode.invalidGeometry,
-        'LWPOLYLINE có đỉnh X cuối không đi kèm Y.',
+        'LWPOLYLINE cÃ³ Ä‘á»‰nh X cuá»‘i khÃ´ng Ä‘i kÃ¨m Y.',
         groupCode: 10,
       );
       return;
@@ -510,7 +532,7 @@ class DxfParserService {
     if (flags == null) {
       malformed(
         DxfDiagnosticCode.invalidNumber,
-        'Flags Group Code 70 của LWPOLYLINE không hợp lệ.',
+        'Flags Group Code 70 cá»§a LWPOLYLINE khÃ´ng há»£p lá»‡.',
         groupCode: 70,
       );
       return;
@@ -520,7 +542,7 @@ class DxfParserService {
     if (vertexCount < minimum) {
       malformed(
         DxfDiagnosticCode.invalidGeometry,
-        'LWPOLYLINE ${isClosed ? 'đóng' : 'mở'} cần ít nhất $minimum đỉnh.',
+        'LWPOLYLINE ${isClosed ? 'Ä‘Ã³ng' : 'má»Ÿ'} cáº§n Ã­t nháº¥t $minimum Ä‘á»‰nh.',
       );
       return;
     }
@@ -529,7 +551,7 @@ class DxfParserService {
     if (declaredText == null) {
       warning(
         DxfDiagnosticCode.lwPolylineVertexCountMissing,
-        'LWPOLYLINE thiếu khai báo số đỉnh Group Code 90.',
+        'LWPOLYLINE thiáº¿u khai bÃ¡o sá»‘ Ä‘á»‰nh Group Code 90.',
         groupCode: 90,
       );
     } else {
@@ -537,7 +559,7 @@ class DxfParserService {
       if (declared == null || declared < 0) {
         malformed(
           DxfDiagnosticCode.invalidNumber,
-          'Số đỉnh Group Code 90 của LWPOLYLINE không hợp lệ.',
+          'Sá»‘ Ä‘á»‰nh Group Code 90 cá»§a LWPOLYLINE khÃ´ng há»£p lá»‡.',
           groupCode: 90,
         );
         return;
@@ -545,7 +567,7 @@ class DxfParserService {
       if (declared != vertexCount) {
         malformed(
           DxfDiagnosticCode.lwPolylineVertexCountMismatch,
-          'LWPOLYLINE khai báo $declared đỉnh nhưng đọc được $vertexCount.',
+          'LWPOLYLINE khai bÃ¡o $declared Ä‘á»‰nh nhÆ°ng Ä‘á»c Ä‘Æ°á»£c $vertexCount.',
           groupCode: 90,
         );
         return;
@@ -561,7 +583,7 @@ class DxfParserService {
           value == null
               ? DxfDiagnosticCode.invalidNumber
               : DxfDiagnosticCode.nonFiniteNumber,
-          'Bulge Group Code 42 của LWPOLYLINE không hợp lệ.',
+          'Bulge Group Code 42 cá»§a LWPOLYLINE khÃ´ng há»£p lá»‡.',
           groupCode: 42,
         );
         return;
@@ -571,7 +593,7 @@ class DxfParserService {
     if (hasNonZeroBulge) {
       warning(
         DxfDiagnosticCode.lwPolylineBulgeNotPreserved,
-        'LWPOLYLINE có bulge; cung được nhập dưới dạng đoạn thẳng.',
+        'LWPOLYLINE cÃ³ bulge; cung Ä‘Æ°á»£c nháº­p dÆ°á»›i dáº¡ng Ä‘oáº¡n tháº³ng.',
         groupCode: 42,
       );
     }
@@ -584,7 +606,7 @@ class DxfParserService {
           value == null
               ? DxfDiagnosticCode.invalidNumber
               : DxfDiagnosticCode.nonFiniteNumber,
-          'Elevation Group Code 38 của LWPOLYLINE không hợp lệ.',
+          'Elevation Group Code 38 cá»§a LWPOLYLINE khÃ´ng há»£p lá»‡.',
           groupCode: 38,
         );
         return;
@@ -593,7 +615,7 @@ class DxfParserService {
     if (elevations.isNotEmpty) {
       warning(
         DxfDiagnosticCode.lwPolylineElevationNotPreserved,
-        'Elevation của LWPOLYLINE chưa được bảo toàn.',
+        'Elevation cá»§a LWPOLYLINE chÆ°a Ä‘Æ°á»£c báº£o toÃ n.',
         groupCode: 38,
       );
     }
@@ -611,7 +633,7 @@ class DxfParserService {
           value != null
               ? DxfDiagnosticCode.nonFiniteNumber
               : DxfDiagnosticCode.lwPolylineOcsNotSupported,
-          'OCS của LWPOLYLINE phải có đủ 210/220/230 hữu hạn.',
+          'OCS cá»§a LWPOLYLINE pháº£i cÃ³ Ä‘á»§ 210/220/230 há»¯u háº¡n.',
           groupCode: code,
         );
         return;
@@ -626,15 +648,206 @@ class DxfParserService {
     if (!isDefault) {
       malformed(
         DxfDiagnosticCode.lwPolylineOcsNotSupported,
-        'LWPOLYLINE dùng OCS phi mặc định chưa được hỗ trợ.',
+        'LWPOLYLINE dÃ¹ng OCS phi máº·c Ä‘á»‹nh chÆ°a Ä‘Æ°á»£c há»— trá»£.',
       );
       return;
     }
     warning(
       DxfDiagnosticCode.lwPolylineDefaultOcs,
-      'LWPOLYLINE khai báo OCS mặc định (0,0,1).',
+      'LWPOLYLINE khai bÃ¡o OCS máº·c Ä‘á»‹nh (0,0,1).',
       groupCode: 210,
     );
+  }
+
+  _DxfR12PolylineParseResult _parseR12PolylineEntity(
+    List<DxfGroupPair> pairs, {
+    required int startIndex,
+    required int featureIndex,
+    required int entityIndex,
+  }) {
+    final headerEnd = _findNextEntityIndex(pairs, startIndex + 1);
+    final headerData = pairs.sublist(startIndex + 1, headerEnd);
+    final layerName = _readString(headerData, 8);
+    final issues = <DxfImportDiagnostic>[];
+
+    _DxfR12PolylineParseResult malformed(
+      DxfDiagnosticCode code,
+      String reason, {
+      int? groupCode,
+      int? nextIndex,
+    }) {
+      issues.add(
+        DxfImportDiagnostic(
+          code: code,
+          severity: DxfDiagnosticSeverity.error,
+          entityType: 'POLYLINE',
+          entityIndex: entityIndex,
+          layerName: layerName,
+          groupCode: groupCode,
+          reason: reason,
+        ),
+      );
+      return _DxfR12PolylineParseResult(
+        feature: null,
+        issues: issues,
+        nextIndex: nextIndex ?? _findR12PolylineEnd(pairs, headerEnd),
+      );
+    }
+
+    final flagsText = _readString(headerData, 70);
+    final flags = flagsText == null ? 0 : int.tryParse(flagsText);
+    if (flags == null) {
+      return malformed(
+        DxfDiagnosticCode.invalidNumber,
+        'Flags Group Code 70 của POLYLINE không hợp lệ.',
+        groupCode: 70,
+      );
+    }
+
+    final unsupportedFlags = flags & ~1;
+    if (unsupportedFlags != 0) {
+      return malformed(
+        DxfDiagnosticCode.invalidGeometry,
+        'POLYLINE dùng flags chưa được hỗ trợ (chỉ hỗ trợ polyline 2D mở/đóng).',
+        groupCode: 70,
+      );
+    }
+
+    final coordinates = <MapCoordinate>[];
+    var cursor = headerEnd;
+    var foundSeqend = false;
+
+    while (cursor < pairs.length) {
+      final marker = pairs[cursor];
+      if (marker.code != 0) {
+        return malformed(
+          DxfDiagnosticCode.malformedEntity,
+          'POLYLINE có dữ liệu ngoài VERTEX/SEQEND không hợp lệ.',
+          nextIndex: cursor + 1,
+        );
+      }
+
+      final type = marker.value.toUpperCase();
+      if (type == 'SEQEND') {
+        foundSeqend = true;
+        cursor = _findNextEntityIndex(pairs, cursor + 1);
+        break;
+      }
+
+      if (type != 'VERTEX') {
+        return malformed(
+          DxfDiagnosticCode.malformedEntity,
+          'POLYLINE thiếu SEQEND trước entity $type.',
+          nextIndex: cursor,
+        );
+      }
+
+      final vertexEnd = _findNextEntityIndex(pairs, cursor + 1);
+      final vertexData = pairs.sublist(cursor + 1, vertexEnd);
+      final vertexFlagsText = _readString(vertexData, 70);
+      final vertexFlags = vertexFlagsText == null
+          ? 0
+          : int.tryParse(vertexFlagsText);
+      if (vertexFlags == null) {
+        return malformed(
+          DxfDiagnosticCode.invalidNumber,
+          'Flags Group Code 70 của VERTEX không hợp lệ.',
+          groupCode: 70,
+        );
+      }
+      if (vertexFlags != 0) {
+        return malformed(
+          DxfDiagnosticCode.invalidGeometry,
+          'VERTEX của POLYLINE dùng flags chưa được hỗ trợ.',
+          groupCode: 70,
+        );
+      }
+
+      final xText = _readString(vertexData, 10);
+      final yText = _readString(vertexData, 20);
+      if (xText == null || yText == null) {
+        return malformed(
+          DxfDiagnosticCode.missingRequiredValue,
+          'VERTEX của POLYLINE thiếu tọa độ X/Y bắt buộc.',
+          groupCode: xText == null ? 10 : 20,
+        );
+      }
+
+      final x = double.tryParse(xText);
+      final y = double.tryParse(yText);
+      final zText = _readString(vertexData, 30);
+      final z = zText == null ? null : double.tryParse(zText);
+
+      if (x == null || y == null || (zText != null && z == null)) {
+        return malformed(
+          DxfDiagnosticCode.invalidNumber,
+          'VERTEX của POLYLINE có tọa độ không phải số hợp lệ.',
+        );
+      }
+      if (!x.isFinite || !y.isFinite || (z != null && !z.isFinite)) {
+        return malformed(
+          DxfDiagnosticCode.nonFiniteNumber,
+          'VERTEX của POLYLINE phải dùng tọa độ hữu hạn.',
+        );
+      }
+
+      coordinates.add(MapCoordinate(x: x, y: y, z: z));
+      cursor = vertexEnd;
+    }
+
+    if (!foundSeqend) {
+      return malformed(
+        DxfDiagnosticCode.malformedEntity,
+        'POLYLINE thiếu entity kết thúc SEQEND.',
+        nextIndex: cursor,
+      );
+    }
+
+    final isClosed = (flags & 1) == 1;
+    final minimum = isClosed ? 3 : 2;
+    if (coordinates.length < minimum) {
+      return malformed(
+        DxfDiagnosticCode.invalidGeometry,
+        'POLYLINE ${isClosed ? 'đóng' : 'mở'} cần ít nhất $minimum đỉnh.',
+        nextIndex: cursor,
+      );
+    }
+
+    final feature = MapFeature(
+      id: 'dxf-polyline-$featureIndex',
+      type: isClosed ? MapFeatureType.polygon : MapFeatureType.polyline,
+      name: isClosed
+          ? 'POLYGON ${featureIndex + 1}'
+          : 'POLYLINE ${featureIndex + 1}',
+      coordinates: coordinates,
+      properties: {
+        ..._createProperties(entityType: 'POLYLINE', layerName: layerName),
+        'closed': isClosed.toString(),
+        'vertexCount': coordinates.length.toString(),
+      },
+    );
+
+    return _DxfR12PolylineParseResult(
+      feature: feature,
+      issues: issues,
+      nextIndex: cursor,
+    );
+  }
+
+  int _findR12PolylineEnd(List<DxfGroupPair> pairs, int startIndex) {
+    var cursor = startIndex;
+
+    while (cursor < pairs.length) {
+      final pair = pairs[cursor];
+
+      if (pair.code == 0 && pair.value.toUpperCase() == 'SEQEND') {
+        return _findNextEntityIndex(pairs, cursor + 1);
+      }
+
+      cursor++;
+    }
+
+    return pairs.length;
   }
 
   List<DxfGroupPair> _getEntitiesSection(List<DxfGroupPair> pairs) {
@@ -1113,6 +1326,18 @@ class DxfImportDiagnostics {
   );
 }
 
+class _DxfR12PolylineParseResult {
+  final MapFeature? feature;
+  final List<DxfImportDiagnostic> issues;
+  final int nextIndex;
+
+  _DxfR12PolylineParseResult({
+    required this.feature,
+    required List<DxfImportDiagnostic> issues,
+    required this.nextIndex,
+  }) : issues = List.unmodifiable(issues);
+}
+
 class _DxfEntityValidation {
   final List<DxfImportDiagnostic> issues;
 
@@ -1148,7 +1373,7 @@ class DxfParseResult {
   final List<DxfGroupPair> pairs;
   final List<String> sections;
 
-  /// Các đối tượng hình học DXF đã đọc thành công.
+  /// CÃ¡c Ä‘á»‘i tÆ°á»£ng hÃ¬nh há»c DXF Ä‘Ã£ Ä‘á»c thÃ nh cÃ´ng.
   final List<MapFeature> features;
 
   final DxfImportDiagnostics diagnostics;
