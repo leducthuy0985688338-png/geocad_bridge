@@ -871,7 +871,7 @@ $label
   });
 
   group('DXF entity color metadata', () {
-    test('preserves ACI group 62 as cad.colorIndex', () async {
+    test('preserves ACI and canonicalizes it to stroke color', () async {
       final result = await parseEntities('''
 0
 LINE
@@ -893,11 +893,12 @@ COLOR-ACI
 
       expect(feature.properties['cad.colorIndex'], '3');
       expect(feature.properties.containsKey('cad.trueColor'), isFalse);
+      expect(feature.properties['style.strokeColor'], '#00FF00');
       expect(result.diagnostics.parsedEntityCount, 1);
       expect(result.diagnostics.hasIssues, isFalse);
     });
 
-    test('preserves True Color group 420 as cad.trueColor', () async {
+    test('preserves True Color and canonicalizes it to stroke color', () async {
       final result = await parseEntities('''
 0
 POINT
@@ -915,18 +916,19 @@ COLOR-TRUE
 
       expect(feature.properties['cad.trueColor'], '16711680');
       expect(feature.properties.containsKey('cad.colorIndex'), isFalse);
+      expect(feature.properties['style.strokeColor'], '#FF0000');
       expect(result.diagnostics.parsedEntityCount, 1);
       expect(result.diagnostics.hasIssues, isFalse);
     });
 
-    test('preserves ACI and True Color together without overwriting', () async {
+    test('True Color wins over ACI while preserving both metadata', () async {
       final result = await parseEntities(r'''
 0
 TEXT
 8
 COLOR-BOTH
 62
-5
+3
 420
 255
 10
@@ -939,14 +941,42 @@ COLOR-BOTH
 
       final feature = result.features.single;
 
-      expect(feature.properties['cad.colorIndex'], '5');
+      expect(feature.properties['cad.colorIndex'], '3');
       expect(feature.properties['cad.trueColor'], '255');
+      expect(feature.properties['style.strokeColor'], '#0000FF');
       expect(feature.name, 'Điểm màu – ຈຸດສີ – Color point');
+      expect(feature.properties['text'], feature.name);
       expect(result.diagnostics.parsedEntityCount, 1);
       expect(result.diagnostics.hasIssues, isFalse);
     });
 
-    test('R12 POLYLINE reads color from header metadata', () async {
+    test('invalid True Color falls back to valid ACI', () async {
+      final result = await parseEntities('''
+0
+LINE
+62
+5
+420
+invalid
+10
+0
+20
+0
+11
+10
+21
+10
+''');
+
+      final feature = result.features.single;
+
+      expect(feature.properties['cad.colorIndex'], '5');
+      expect(feature.properties['cad.trueColor'], 'invalid');
+      expect(feature.properties['style.strokeColor'], '#0000FF');
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+
+    test('R12 POLYLINE canonicalizes color from header metadata', () async {
       final result = await parseRaw(
         _r12PolylineDxf(
           0,
@@ -964,6 +994,95 @@ COLOR-BOTH
       expect(feature.properties['entityType'], 'POLYLINE');
       expect(feature.properties['cad.colorIndex'], '2');
       expect(feature.properties['cad.trueColor'], '65280');
+      expect(feature.properties['style.strokeColor'], '#00FF00');
+      expect(result.diagnostics.parsedEntityCount, 1);
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+
+    test('does not canonicalize ACI 0 BYBLOCK', () async {
+      final result = await parseEntities('''
+0
+POINT
+62
+0
+10
+1
+20
+2
+''');
+
+      final feature = result.features.single;
+
+      expect(feature.properties['cad.colorIndex'], '0');
+      expect(feature.properties.containsKey('style.strokeColor'), isFalse);
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+
+    test('does not canonicalize ACI 256 BYLAYER', () async {
+      final result = await parseEntities('''
+0
+POINT
+62
+256
+10
+1
+20
+2
+''');
+
+      final feature = result.features.single;
+
+      expect(feature.properties['cad.colorIndex'], '256');
+      expect(feature.properties.containsKey('style.strokeColor'), isFalse);
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+
+    test('does not canonicalize negative ACI', () async {
+      final result = await parseEntities('''
+0
+POINT
+62
+-3
+10
+1
+20
+2
+''');
+
+      final feature = result.features.single;
+
+      expect(feature.properties['cad.colorIndex'], '-3');
+      expect(feature.properties.containsKey('style.strokeColor'), isFalse);
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+
+    test('color canonicalization preserves multilingual TEXT exactly', () async {
+      const label =
+          'Tiếng Việt – Đường thử nghiệm | ພາສາລາວ – ທົດສອບ | English – Test feature';
+
+      final result = await parseEntities('''
+0
+TEXT
+8
+UNICODE-COLOR
+62
+6
+10
+106
+20
+16
+1
+$label
+''');
+
+      final feature = result.features.single;
+
+      expect(feature.type, MapFeatureType.text);
+      expect(feature.name, label);
+      expect(feature.properties['text'], label);
+      expect(feature.properties['cadLayer'], 'UNICODE-COLOR');
+      expect(feature.properties['cad.colorIndex'], '6');
+      expect(feature.properties['style.strokeColor'], '#FF00FF');
       expect(result.diagnostics.parsedEntityCount, 1);
       expect(result.diagnostics.hasIssues, isFalse);
     });

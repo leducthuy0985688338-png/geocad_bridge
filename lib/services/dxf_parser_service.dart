@@ -2,8 +2,10 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import '../models/map_feature.dart';
+import 'cad_color_service.dart';
 
 class DxfParserService {
+  static const _cadColorService = CadColorService();
   const DxfParserService();
 
   /// Đọc file DXF dạng ASCII.
@@ -1025,6 +1027,16 @@ class DxfParserService {
     final trueColor = _readString(data, 420);
     if (trueColor != null && trueColor.isNotEmpty) {
       properties['cad.trueColor'] = trueColor;
+    }
+
+    final canonicalColor = _cadColorService.resolveCanonicalColor(
+      colorIndex: colorIndex,
+      trueColor: trueColor,
+    );
+
+    if (canonicalColor != null &&
+        !properties.containsKey('style.strokeColor')) {
+      properties['style.strokeColor'] = canonicalColor;
     }
 
     return properties;
