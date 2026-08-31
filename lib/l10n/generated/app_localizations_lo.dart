@@ -119,4 +119,68 @@ class AppLocalizationsLo extends AppLocalizations {
   String projectContentSummary(int layerCount, int featureCount) {
     return '$layerCount ຊັ້ນ • $featureCount ວັດຖຸ';
   }
+
+  @override
+  String get lockLayer => 'ລັອກຊັ້ນ';
+
+  @override
+  String get knownCrsUseCoordinateConversion =>
+      'ກຳນົດ CRS ແລ້ວ; ໃຫ້ໃຊ້ການແປງພິກັດ';
+
+  @override
+  String get manualLayer => 'ກຳນົດເອງ';
+
+  @override
+  String get georeferenceLayer => 'ກຳນົດຕຳແໜ່ງຊັ້ນດ້ວຍຈຸດຄວບຄຸມ';
+
+  @override
+  String layerObjectCount(int count) {
+    return '$count ວັດຖຸ';
+  }
+
+  @override
+  String get moveLayerDown => 'ຍ້າຍຊັ້ນລົງ';
+
+  @override
+  String get moveLayerUp => 'ຍ້າຍຊັ້ນຂຶ້ນ';
+
+  @override
+  String get createUtmLayer => 'ສ້າງຊັ້ນ UTM';
+
+  @override
+  String get redo => 'ເຮັດຄືນ (Ctrl+Y)';
+
+  @override
+  String get editSourceCrs => 'ແກ້ໄຂ CRS ຕົ້ນທາງ';
+
+  @override
+  String get hideLayer => 'ເຊື່ອງຊັ້ນ';
+
+  @override
+  String get readingDrawingData => 'ກຳລັງອ່ານຂໍ້ມູນແບບ...';
+
+  @override
+  String get showLayer => 'ສະແດງຊັ້ນ';
+
+  @override
+  String get undo => 'ຍ້ອນກັບ (Ctrl+Z)';
+
+  @override
+  String get removeLayer => 'ລຶບຊັ້ນອອກຈາກໂຄງການ';
+
+  @override
+  String get assignSourceCrs => 'ກຳນົດ CRS ຕົ້ນທາງ';
+
+  @override
+  String get welcomeTagline => 'ຊ້ອນຂໍ້ມູນ • ແກ້ໄຂ • ແປງ • ສົ່ງອອກ';
+
+  @override
+  String get welcomeAddData =>
+      'ເພີ່ມແບບ AutoCAD ໜຶ່ງ ຫຼື ຫຼາຍແບບ ເພື່ອເລີ່ມສ້າງໂຄງການ.';
+
+  @override
+  String get createWgs84Layer => 'ສ້າງຊັ້ນ WGS84';
+
+  @override
+  String get unlockLayer => 'ປົດລັອກຊັ້ນ';
 }

@@ -61,5 +61,32 @@
                                                                              "type":  "int"
                                                                          }
                                                     }
-                               }
+                               },
+    "lockLayer":  "ລັອກຊັ້ນ",
+    "knownCrsUseCoordinateConversion":  "ກຳນົດ CRS ແລ້ວ; ໃຫ້ໃຊ້ການແປງພິກັດ",
+    "manualLayer":  "ກຳນົດເອງ",
+    "georeferenceLayer":  "ກຳນົດຕຳແໜ່ງຊັ້ນດ້ວຍຈຸດຄວບຄຸມ",
+    "layerObjectCount":  "{count} ວັດຖຸ",
+    "moveLayerDown":  "ຍ້າຍຊັ້ນລົງ",
+    "moveLayerUp":  "ຍ້າຍຊັ້ນຂຶ້ນ",
+    "createUtmLayer":  "ສ້າງຊັ້ນ UTM",
+    "redo":  "ເຮັດຄືນ (Ctrl+Y)",
+    "editSourceCrs":  "ແກ້ໄຂ CRS ຕົ້ນທາງ",
+    "hideLayer":  "ເຊື່ອງຊັ້ນ",
+    "readingDrawingData":  "ກຳລັງອ່ານຂໍ້ມູນແບບ...",
+    "showLayer":  "ສະແດງຊັ້ນ",
+    "undo":  "ຍ້ອນກັບ (Ctrl+Z)",
+    "removeLayer":  "ລຶບຊັ້ນອອກຈາກໂຄງການ",
+    "assignSourceCrs":  "ກຳນົດ CRS ຕົ້ນທາງ",
+    "welcomeTagline":  "ຊ້ອນຂໍ້ມູນ • ແກ້ໄຂ • ແປງ • ສົ່ງອອກ",
+    "welcomeAddData":  "ເພີ່ມແບບ AutoCAD ໜຶ່ງ ຫຼື ຫຼາຍແບບ ເພື່ອເລີ່ມສ້າງໂຄງການ.",
+    "createWgs84Layer":  "ສ້າງຊັ້ນ WGS84",
+    "unlockLayer":  "ປົດລັອກຊັ້ນ",
+    "@layerObjectCount":  {
+                              "placeholders":  {
+                                                   "count":  {
+                                                                 "type":  "int"
+                                                             }
+                                               }
+                          }
 }

@@ -309,6 +309,126 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'{layerCount} lớp • {featureCount} đối tượng'**
   String projectContentSummary(int layerCount, int featureCount);
+
+  /// No description provided for @lockLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Khóa layer'**
+  String get lockLayer;
+
+  /// No description provided for @knownCrsUseCoordinateConversion.
+  ///
+  /// In vi, this message translates to:
+  /// **'CRS đã xác định; hãy dùng chuyển đổi tọa độ'**
+  String get knownCrsUseCoordinateConversion;
+
+  /// No description provided for @manualLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'THỦ CÔNG'**
+  String get manualLayer;
+
+  /// No description provided for @georeferenceLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Định vị layer bằng các điểm khống chế'**
+  String get georeferenceLayer;
+
+  /// No description provided for @layerObjectCount.
+  ///
+  /// In vi, this message translates to:
+  /// **'{count} đối tượng'**
+  String layerObjectCount(int count);
+
+  /// No description provided for @moveLayerDown.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đưa layer xuống'**
+  String get moveLayerDown;
+
+  /// No description provided for @moveLayerUp.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đưa layer lên'**
+  String get moveLayerUp;
+
+  /// No description provided for @createUtmLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tạo layer UTM'**
+  String get createUtmLayer;
+
+  /// No description provided for @redo.
+  ///
+  /// In vi, this message translates to:
+  /// **'Redo (Ctrl+Y)'**
+  String get redo;
+
+  /// No description provided for @editSourceCrs.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉnh sửa hệ tọa độ nguồn'**
+  String get editSourceCrs;
+
+  /// No description provided for @hideLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ẩn layer'**
+  String get hideLayer;
+
+  /// No description provided for @readingDrawingData.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang đọc dữ liệu bản vẽ...'**
+  String get readingDrawingData;
+
+  /// No description provided for @showLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hiện layer'**
+  String get showLayer;
+
+  /// No description provided for @undo.
+  ///
+  /// In vi, this message translates to:
+  /// **'Undo (Ctrl+Z)'**
+  String get undo;
+
+  /// No description provided for @removeLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xóa layer khỏi dự án'**
+  String get removeLayer;
+
+  /// No description provided for @assignSourceCrs.
+  ///
+  /// In vi, this message translates to:
+  /// **'Gán hệ tọa độ nguồn'**
+  String get assignSourceCrs;
+
+  /// No description provided for @welcomeTagline.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lồng ghép • Chỉnh sửa • Chuyển đổi • Xuất bản'**
+  String get welcomeTagline;
+
+  /// No description provided for @welcomeAddData.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hãy thêm một hoặc nhiều bản vẽ AutoCAD để bắt đầu tạo project.'**
+  String get welcomeAddData;
+
+  /// No description provided for @createWgs84Layer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tạo layer WGS84'**
+  String get createWgs84Layer;
+
+  /// No description provided for @unlockLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mở khóa layer'**
+  String get unlockLayer;
 }
 
 class _AppLocalizationsDelegate

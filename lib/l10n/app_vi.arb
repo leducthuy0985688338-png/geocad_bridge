@@ -61,5 +61,32 @@
                                                                              "type":  "int"
                                                                          }
                                                     }
-                               }
+                               },
+    "lockLayer":  "Khóa layer",
+    "knownCrsUseCoordinateConversion":  "CRS đã xác định; hãy dùng chuyển đổi tọa độ",
+    "manualLayer":  "THỦ CÔNG",
+    "georeferenceLayer":  "Định vị layer bằng các điểm khống chế",
+    "layerObjectCount":  "{count} đối tượng",
+    "moveLayerDown":  "Đưa layer xuống",
+    "moveLayerUp":  "Đưa layer lên",
+    "createUtmLayer":  "Tạo layer UTM",
+    "redo":  "Redo (Ctrl+Y)",
+    "editSourceCrs":  "Chỉnh sửa hệ tọa độ nguồn",
+    "hideLayer":  "Ẩn layer",
+    "readingDrawingData":  "Đang đọc dữ liệu bản vẽ...",
+    "showLayer":  "Hiện layer",
+    "undo":  "Undo (Ctrl+Z)",
+    "removeLayer":  "Xóa layer khỏi dự án",
+    "assignSourceCrs":  "Gán hệ tọa độ nguồn",
+    "welcomeTagline":  "Lồng ghép • Chỉnh sửa • Chuyển đổi • Xuất bản",
+    "welcomeAddData":  "Hãy thêm một hoặc nhiều bản vẽ AutoCAD để bắt đầu tạo project.",
+    "createWgs84Layer":  "Tạo layer WGS84",
+    "unlockLayer":  "Mở khóa layer",
+    "@layerObjectCount":  {
+                              "placeholders":  {
+                                                   "count":  {
+                                                                 "type":  "int"
+                                                             }
+                                               }
+                          }
 }

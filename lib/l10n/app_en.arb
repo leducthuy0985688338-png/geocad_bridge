@@ -61,5 +61,32 @@
                                                                              "type":  "int"
                                                                          }
                                                     }
-                               }
+                               },
+    "lockLayer":  "Lock layer",
+    "knownCrsUseCoordinateConversion":  "CRS is defined; use coordinate conversion",
+    "manualLayer":  "MANUAL",
+    "georeferenceLayer":  "Georeference layer using control points",
+    "layerObjectCount":  "{count} objects",
+    "moveLayerDown":  "Move layer down",
+    "moveLayerUp":  "Move layer up",
+    "createUtmLayer":  "Create UTM layer",
+    "redo":  "Redo (Ctrl+Y)",
+    "editSourceCrs":  "Edit source CRS",
+    "hideLayer":  "Hide layer",
+    "readingDrawingData":  "Reading drawing data...",
+    "showLayer":  "Show layer",
+    "undo":  "Undo (Ctrl+Z)",
+    "removeLayer":  "Remove layer from project",
+    "assignSourceCrs":  "Assign source CRS",
+    "welcomeTagline":  "Overlay • Edit • Convert • Export",
+    "welcomeAddData":  "Add one or more AutoCAD drawings to start creating a project.",
+    "createWgs84Layer":  "Create WGS84 layer",
+    "unlockLayer":  "Unlock layer",
+    "@layerObjectCount":  {
+                              "placeholders":  {
+                                                   "count":  {
+                                                                 "type":  "int"
+                                                             }
+                                               }
+                          }
 }

@@ -119,4 +119,68 @@ class AppLocalizationsEn extends AppLocalizations {
   String projectContentSummary(int layerCount, int featureCount) {
     return '$layerCount layers • $featureCount objects';
   }
+
+  @override
+  String get lockLayer => 'Lock layer';
+
+  @override
+  String get knownCrsUseCoordinateConversion =>
+      'CRS is defined; use coordinate conversion';
+
+  @override
+  String get manualLayer => 'MANUAL';
+
+  @override
+  String get georeferenceLayer => 'Georeference layer using control points';
+
+  @override
+  String layerObjectCount(int count) {
+    return '$count objects';
+  }
+
+  @override
+  String get moveLayerDown => 'Move layer down';
+
+  @override
+  String get moveLayerUp => 'Move layer up';
+
+  @override
+  String get createUtmLayer => 'Create UTM layer';
+
+  @override
+  String get redo => 'Redo (Ctrl+Y)';
+
+  @override
+  String get editSourceCrs => 'Edit source CRS';
+
+  @override
+  String get hideLayer => 'Hide layer';
+
+  @override
+  String get readingDrawingData => 'Reading drawing data...';
+
+  @override
+  String get showLayer => 'Show layer';
+
+  @override
+  String get undo => 'Undo (Ctrl+Z)';
+
+  @override
+  String get removeLayer => 'Remove layer from project';
+
+  @override
+  String get assignSourceCrs => 'Assign source CRS';
+
+  @override
+  String get welcomeTagline => 'Overlay • Edit • Convert • Export';
+
+  @override
+  String get welcomeAddData =>
+      'Add one or more AutoCAD drawings to start creating a project.';
+
+  @override
+  String get createWgs84Layer => 'Create WGS84 layer';
+
+  @override
+  String get unlockLayer => 'Unlock layer';
 }

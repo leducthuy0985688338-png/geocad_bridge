@@ -1378,12 +1378,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.white38,
                 ),
                 IconButton(
-                  tooltip: 'Undo (Ctrl+Z)',
+                  tooltip: l10n.undo,
                   onPressed: !_isProjectBusy && _history.canUndo ? _undo : null,
                   icon: const Icon(Icons.undo),
                 ),
                 IconButton(
-                  tooltip: 'Redo (Ctrl+Y)',
+                  tooltip: l10n.redo,
                   onPressed: !_isProjectBusy && _history.canRedo ? _redo : null,
                   icon: const Icon(Icons.redo),
                 ),
@@ -2048,6 +2048,7 @@ class _LayerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2062,7 +2063,7 @@ class _LayerCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconButton(
-                  tooltip: layer.visible ? 'Ẩn layer' : 'Hiện layer',
+                  tooltip: layer.visible ? l10n.hideLayer : l10n.showLayer,
                   onPressed: onToggleVisibility,
                   icon: Icon(
                     layer.visible ? Icons.visibility : Icons.visibility_off,
@@ -2084,8 +2085,8 @@ class _LayerCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${_layerTypeLabel(layer.sourceType)}'
-                        ' • ${layer.featureCount} đối tượng',
+                        '${_layerTypeLabel(layer.sourceType, l10n)}'
+                        ' • ${l10n.layerObjectCount(layer.featureCount)}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: Colors.grey,
@@ -2132,7 +2133,7 @@ class _LayerCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: layer.locked ? 'Mở khóa layer' : 'Khóa layer',
+                  tooltip: layer.locked ? l10n.unlockLayer : l10n.lockLayer,
                   onPressed: onToggleLock,
                   icon: Icon(layer.locked ? Icons.lock : Icons.lock_open),
                 ),
@@ -2144,17 +2145,17 @@ class _LayerCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               IconButton(
-                tooltip: 'Đưa layer lên',
+                tooltip: l10n.moveLayerUp,
                 onPressed: isFirst ? null : onMoveUp,
                 icon: const Icon(Icons.keyboard_arrow_up),
               ),
               IconButton(
-                tooltip: 'Đưa layer xuống',
+                tooltip: l10n.moveLayerDown,
                 onPressed: isLast ? null : onMoveDown,
                 icon: const Icon(Icons.keyboard_arrow_down),
               ),
               IconButton(
-                tooltip: 'Định vị layer bằng các điểm khống chế',
+                tooltip: l10n.georeferenceLayer,
                 onPressed:
                     layer.isCad &&
                         layer.crs.isLocalCad &&
@@ -2165,25 +2166,25 @@ class _LayerCard extends StatelessWidget {
               ),
               if (layer.crs.isWgs84)
                 IconButton(
-                  tooltip: 'Tạo layer UTM',
+                  tooltip: l10n.createUtmLayer,
                   onPressed: layer.features.isEmpty ? null : onCreateUtm,
                   icon: const Icon(Icons.grid_on),
                 )
               else
                 IconButton(
-                  tooltip: 'Tạo layer WGS84',
+                  tooltip: l10n.createWgs84Layer,
                   onPressed: layer.canTransformToWgs84 ? onCreateWgs84 : null,
                   icon: const Icon(Icons.public),
                 ),
               IconButton(
                 tooltip: layer.crs.isLocalCad
-                    ? 'Gán hệ tọa độ nguồn'
-                    : 'CRS đã xác định; hãy dùng chuyển đổi tọa độ',
+                    ? l10n.assignSourceCrs
+                    : l10n.knownCrsUseCoordinateConversion,
                 onPressed: layer.crs.isLocalCad ? onEditCrs : null,
                 icon: const Icon(Icons.language),
               ),
               IconButton(
-                tooltip: 'Xóa layer khỏi dự án',
+                tooltip: l10n.removeLayer,
                 onPressed: onRemove,
                 icon: const Icon(Icons.delete_outline),
               ),
@@ -2194,7 +2195,7 @@ class _LayerCard extends StatelessWidget {
     );
   }
 
-  String _layerTypeLabel(MapLayerSourceType type) {
+  String _layerTypeLabel(MapLayerSourceType type, AppLocalizations l10n) {
     switch (type) {
       case MapLayerSourceType.dwg:
         return 'DWG';
@@ -2205,7 +2206,7 @@ class _LayerCard extends StatelessWidget {
       case MapLayerSourceType.kmz:
         return 'KMZ';
       case MapLayerSourceType.manual:
-        return 'THỦ CÔNG';
+        return l10n.manualLayer;
     }
   }
 }
@@ -2223,14 +2224,16 @@ class _Workspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     if (isImporting) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Đang đọc dữ liệu bản vẽ...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(l10n.readingDrawingData),
           ],
         ),
       );
@@ -2299,8 +2302,10 @@ class _WorkspaceHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${project.layerCount} lớp • '
-                  '${project.featureCount} đối tượng',
+                  l10n.projectContentSummary(
+                    project.layerCount,
+                    project.featureCount,
+                  ),
                   style: const TextStyle(fontSize: 11, color: Colors.grey),
                 ),
               ],
@@ -2402,6 +2407,8 @@ class _EmptyWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(32),
@@ -2417,17 +2424,13 @@ class _EmptyWorkspace extends StatelessWidget {
               style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Lồng ghép • Chỉnh sửa • Chuyển đổi • Xuất bản',
+            Text(
+              l10n.welcomeTagline,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 32),
-            const Text(
-              'Hãy thêm một hoặc nhiều bản vẽ AutoCAD '
-              'để bắt đầu tạo project.',
-              textAlign: TextAlign.center,
-            ),
+            Text(l10n.welcomeAddData, textAlign: TextAlign.center),
           ],
         ),
       ),
