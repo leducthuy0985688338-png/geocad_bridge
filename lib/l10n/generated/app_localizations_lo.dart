@@ -294,4 +294,128 @@ class AppLocalizationsLo extends AppLocalizations {
 
   @override
   String get apply => 'ນຳໃຊ້';
+
+  @override
+  String get sourceCoordinateSystem => 'ລະບົບພິກັດຕົ້ນທາງ';
+
+  @override
+  String get targetCoordinateSystem => 'ລະບົບພິກັດປາຍທາງ';
+
+  @override
+  String get autoUtmHint =>
+      'ເມື່ອແປງ WGS84 → UTM, Zone ແລະ ຊີກໂລກຈະຖືກກຳນົດອັດຕະໂນມັດຈາກ Longitude/Latitude.';
+
+  @override
+  String get swapDirection => 'ສະຫຼັບທິດທາງ';
+
+  @override
+  String get convert => 'ແປງ';
+
+  @override
+  String get coordinateInputRequired => 'ກະລຸນາປ້ອນຄ່າພິກັດທີ່ຖືກຕ້ອງສອງຄ່າ.';
+
+  @override
+  String get wgs84Result => 'ຜົນ WGS84';
+
+  @override
+  String get utmResult => 'ຜົນ UTM';
+
+  @override
+  String get longitudeLatitudeRange =>
+      'Longitude ຕ້ອງຢູ່ໃນ [-180, 180] ແລະ Latitude ຢູ່ໃນ [-90, 90].';
+
+  @override
+  String get invalidCoordinates => 'ຄ່າພິກັດທີ່ປ້ອນບໍ່ຖືກຕ້ອງ.';
+
+  @override
+  String get coordinateConversionFailed =>
+      'ບໍ່ສາມາດແປງພິກັດໄດ້. ກະລຸນາກວດສອບຂໍ້ມູນປ້ອນ.';
+
+  @override
+  String get cadLocalConversionNote =>
+      'ໝາຍເຫດ: ພິກັດ CAD ທ້ອງຖິ່ນຍັງບໍ່ສາມາດແປງໄປ WGS84 ໂດຍກົງ ຈົນກວ່າຈະຮູ້ CRS ຫຼື ການອ້າງອີງຕຳແໜ່ງຂອງແບບ.';
+
+  @override
+  String get georeferenceCadDrawing => 'ອ້າງອີງຕຳແໜ່ງແບບ CAD';
+
+  @override
+  String get targetCrs => 'CRS ປາຍທາງ';
+
+  @override
+  String get addControlPoint => 'ເພີ່ມຈຸດຄວບຄຸມ';
+
+  @override
+  String get calculateGeoreferencePreview => 'ຄຳນວນຕົວຢ່າງການອ້າງອີງຕຳແໜ່ງ';
+
+  @override
+  String get georeferenceInstructions =>
+      'ປ້ອນຢ່າງໜ້ອຍສອງຈຸດ CAD ແລະ ພິກັດ UTM ຈິງທີ່ກົງກັນ. ຖ້າມີຫຼາຍກວ່າສອງຈຸດ ແອັບຈະໃຊ້ການປັບແບບ least-squares.';
+
+  @override
+  String get createGeoreferencedLayer => 'ສ້າງຊັ້ນທີ່ອ້າງອີງຕຳແໜ່ງແລ້ວ';
+
+  @override
+  String get invalidControlPointData => 'ຂໍ້ມູນຈຸດຄວບຄຸມບໍ່ຖືກຕ້ອງ.';
+
+  @override
+  String get georeferenceCalculationFailed =>
+      'ບໍ່ສາມາດຄຳນວນການອ້າງອີງຕຳແໜ່ງໄດ້. ກະລຸນາກວດສອບຈຸດຄວບຄຸມ.';
+
+  @override
+  String invalidNumber(String label) {
+    return '$label ບໍ່ແມ່ນຕົວເລກທີ່ຖືກຕ້ອງ.';
+  }
+
+  @override
+  String controlPoint(int number) {
+    return 'ຈຸດຄວບຄຸມ $number';
+  }
+
+  @override
+  String get suspectedReview => 'ສົງໄສ — ຕ້ອງກວດສອບ';
+
+  @override
+  String get largestError => 'ຄ່າຜິດພາດສູງສຸດ';
+
+  @override
+  String removePoint(int number) {
+    return 'ລຶບຈຸດ $number';
+  }
+
+  @override
+  String residualSummary(String deltaX, String deltaY, String error) {
+    return 'ΔX: $deltaX m • ΔY: $deltaY m • ຄ່າຜິດພາດ: $error m';
+  }
+
+  @override
+  String get twoPointTransform => 'ການແປງ 2 ຈຸດ';
+
+  @override
+  String leastSquaresAdjustment(int count) {
+    return 'ການປັບ least-squares ດ້ວຍ $count ຈຸດ';
+  }
+
+  @override
+  String maxResidualSummary(String error, int number) {
+    return 'ຄ່າຜິດພາດສູງສຸດ: $error m (ຈຸດ $number)';
+  }
+
+  @override
+  String get outlierNotApplicable => 'ສອງຈຸດ: ບໍ່ສາມາດໃຊ້ການກວດຫາ outlier.';
+
+  @override
+  String get outlierInsufficientSample =>
+      'ຕົວຢ່າງບໍ່ພຽງພໍສຳລັບປະເມີນ outlier; ຈຸດທີ່ໃຫຍ່ສຸດໃຊ້ເປັນຂໍ້ອ້າງອີງເທົ່ານັ້ນ.';
+
+  @override
+  String get outlierNoRelativeAnomaly =>
+      'ບໍ່ພົບຄວາມຜິດປົກກະຕິສຳພັນໃນ residual.';
+
+  @override
+  String get outlierReviewSuggested =>
+      'ພົບຈຸດທີ່ໜ້າສົງໄສ — ກະລຸນາກວດສອບ ຫຼື ແກ້ໄຂດ້ວຍຕົນເອງ.';
+
+  @override
+  String get outlierMultipleLargeResiduals =>
+      'ມີ residual ຫຼາຍຄ່າທີ່ຕ້ອງກວດສອບໂດຍລວມ.';
 }

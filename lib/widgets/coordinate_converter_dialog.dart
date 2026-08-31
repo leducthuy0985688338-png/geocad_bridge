@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
+
 import '../models/coordinate_reference_system.dart';
 import '../services/coordinate_transform_service.dart';
 
-enum CoordinateConversionDirection {
-  utmToWgs84,
-  wgs84ToUtm,
-}
+enum CoordinateConversionDirection { utmToWgs84, wgs84ToUtm }
 
 class CoordinateConverterDialog extends StatefulWidget {
   const CoordinateConverterDialog({super.key});
@@ -16,16 +15,13 @@ class CoordinateConverterDialog extends StatefulWidget {
       _CoordinateConverterDialogState();
 }
 
-class _CoordinateConverterDialogState
-    extends State<CoordinateConverterDialog> {
+class _CoordinateConverterDialogState extends State<CoordinateConverterDialog> {
   final CoordinateTransformService _service =
       const CoordinateTransformService();
 
-  final TextEditingController _firstController =
-      TextEditingController();
+  final TextEditingController _firstController = TextEditingController();
 
-  final TextEditingController _secondController =
-      TextEditingController();
+  final TextEditingController _secondController = TextEditingController();
 
   CoordinateConversionDirection _direction =
       CoordinateConversionDirection.utmToWgs84;
@@ -50,14 +46,9 @@ class _CoordinateConverterDialogState
       _direction == CoordinateConversionDirection.utmToWgs84;
 
   CoordinateReferenceSystem get _utmCrs =>
-      CoordinateReferenceSystem.utm(
-        utmZone: _utmZone,
-        hemisphere: _hemisphere,
-      );
+      CoordinateReferenceSystem.utm(utmZone: _utmZone, hemisphere: _hemisphere);
 
-  void _changeDirection(
-    CoordinateConversionDirection direction,
-  ) {
+  void _changeDirection(CoordinateConversionDirection direction) {
     if (_direction == direction) {
       return;
     }
@@ -87,16 +78,14 @@ class _CoordinateConverterDialogState
   }
 
   void _convert() {
-    final first =
-        double.tryParse(_firstController.text.trim());
-    final second =
-        double.tryParse(_secondController.text.trim());
+    final l10n = AppLocalizations.of(context);
+    final first = double.tryParse(_firstController.text.trim());
+    final second = double.tryParse(_secondController.text.trim());
 
     if (first == null || second == null) {
       setState(() {
         _clearResult();
-        _errorMessage =
-            'Vui lòng nhập đủ hai giá trị tọa độ hợp lệ.';
+        _errorMessage = l10n.coordinateInputRequired;
       });
       return;
     }
@@ -112,31 +101,21 @@ class _CoordinateConverterDialogState
 
         setState(() {
           _clearResult();
-          _resultTitle = 'Kết quả WGS84';
-          _resultLine1 =
-              'Longitude: ${result.longitude.toStringAsFixed(8)}°';
-          _resultLine2 =
-              'Latitude: ${result.latitude.toStringAsFixed(8)}°';
+          _resultTitle = l10n.wgs84Result;
+          _resultLine1 = 'Longitude: ${result.longitude.toStringAsFixed(8)}°';
+          _resultLine2 = 'Latitude: ${result.latitude.toStringAsFixed(8)}°';
           _resultCrs = 'EPSG:4326';
         });
       } else {
         final longitude = first;
         final latitude = second;
 
-        if (!_service.isValidWgs84(
-          longitude: longitude,
-          latitude: latitude,
-        )) {
-          throw ArgumentError(
-            'Longitude phải trong [-180, 180] và '
-            'Latitude trong [-90, 90].',
-          );
+        if (!_service.isValidWgs84(longitude: longitude, latitude: latitude)) {
+          throw ArgumentError(l10n.longitudeLatitudeRange);
         }
 
-        final suggestedZone =
-            _service.suggestedUtmZone(longitude);
-        final suggestedHemisphere =
-            _service.suggestedHemisphere(latitude);
+        final suggestedZone = _service.suggestedUtmZone(longitude);
+        final suggestedHemisphere = _service.suggestedHemisphere(latitude);
 
         final result = _service.wgs84ToUtm(
           longitude: longitude,
@@ -145,8 +124,7 @@ class _CoordinateConverterDialogState
           hemisphere: suggestedHemisphere,
         );
 
-        final resultCrs =
-            CoordinateReferenceSystem.utm(
+        final resultCrs = CoordinateReferenceSystem.utm(
           utmZone: suggestedZone,
           hemisphere: suggestedHemisphere,
         );
@@ -155,13 +133,10 @@ class _CoordinateConverterDialogState
           _utmZone = suggestedZone;
           _hemisphere = suggestedHemisphere;
           _clearResult();
-          _resultTitle = 'Kết quả UTM';
-          _resultLine1 =
-              'Easting (X): ${result.x.toStringAsFixed(3)} m';
-          _resultLine2 =
-              'Northing (Y): ${result.y.toStringAsFixed(3)} m';
-          _resultCrs =
-              '${resultCrs.displayName} • EPSG:${resultCrs.epsgCode}';
+          _resultTitle = l10n.utmResult;
+          _resultLine1 = 'Easting (X): ${result.x.toStringAsFixed(3)} m';
+          _resultLine2 = 'Northing (Y): ${result.y.toStringAsFixed(3)} m';
+          _resultCrs = '${resultCrs.displayName} • EPSG:${resultCrs.epsgCode}';
         });
       }
     } catch (error) {
@@ -176,28 +151,25 @@ class _CoordinateConverterDialogState
     if (error is ArgumentError) {
       final message = error.message;
       return message?.toString() ??
-          'Tọa độ nhập vào không hợp lệ.';
+          AppLocalizations.of(context).invalidCoordinates;
     }
 
     if (error is StateError) {
       return error.message;
     }
 
-    return 'Không thể chuyển đổi tọa độ. '
-        'Hãy kiểm tra lại dữ liệu đầu vào.';
+    return AppLocalizations.of(context).coordinateConversionFailed;
   }
 
   @override
   Widget build(BuildContext context) {
     final crs = _utmCrs;
+    final l10n = AppLocalizations.of(context);
 
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 720,
-          maxHeight: 720,
-        ),
+        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 720),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -212,30 +184,27 @@ class _CoordinateConverterDialogState
                     size: 28,
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Chuyển đổi tọa độ',
-                          style: TextStyle(
+                          l10n.coordinateConverter,
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 3),
+                        const SizedBox(height: 3),
                         Text(
-                          'WGS84 ↔ UTM',
-                          style: TextStyle(
-                            color: Colors.grey,
-                          ),
+                          l10n.utmWgs84,
+                          style: const TextStyle(color: Colors.grey),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Đóng',
+                    tooltip: l10n.close,
                     onPressed: () {
                       Navigator.of(context).pop();
                     },
@@ -247,14 +216,12 @@ class _CoordinateConverterDialogState
               SegmentedButton<CoordinateConversionDirection>(
                 segments: const [
                   ButtonSegment(
-                    value:
-                        CoordinateConversionDirection.utmToWgs84,
+                    value: CoordinateConversionDirection.utmToWgs84,
                     icon: Icon(Icons.map_outlined),
                     label: Text('UTM → WGS84'),
                   ),
                   ButtonSegment(
-                    value:
-                        CoordinateConversionDirection.wgs84ToUtm,
+                    value: CoordinateConversionDirection.wgs84ToUtm,
                     icon: Icon(Icons.public),
                     label: Text('WGS84 → UTM'),
                   ),
@@ -267,8 +234,8 @@ class _CoordinateConverterDialogState
               const SizedBox(height: 18),
               _CrsCard(
                 title: _isUtmToWgs84
-                    ? 'Hệ tọa độ nguồn'
-                    : 'Hệ tọa độ đích',
+                    ? l10n.sourceCoordinateSystem
+                    : l10n.targetCoordinateSystem,
                 crsName: crs.displayName,
                 epsgCode: crs.epsgCode,
                 child: Row(
@@ -276,17 +243,15 @@ class _CoordinateConverterDialogState
                     Expanded(
                       child: DropdownButtonFormField<int>(
                         initialValue: _utmZone,
-                        decoration: const InputDecoration(
-                          labelText: 'UTM Zone',
+                        decoration: InputDecoration(
+                          labelText: l10n.utmZone,
                           border: OutlineInputBorder(),
                         ),
                         items: List.generate(
                           60,
                           (index) => DropdownMenuItem(
                             value: index + 1,
-                            child: Text(
-                              'Zone ${index + 1}',
-                            ),
+                            child: Text('Zone ${index + 1}'),
                           ),
                         ),
                         onChanged: _isUtmToWgs84
@@ -302,21 +267,20 @@ class _CoordinateConverterDialogState
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child:
-                          DropdownButtonFormField<UtmHemisphere>(
+                      child: DropdownButtonFormField<UtmHemisphere>(
                         initialValue: _hemisphere,
-                        decoration: const InputDecoration(
-                          labelText: 'Bán cầu',
+                        decoration: InputDecoration(
+                          labelText: l10n.hemisphere,
                           border: OutlineInputBorder(),
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: UtmHemisphere.north,
-                            child: Text('Bắc (North)'),
+                            child: Text(l10n.north),
                           ),
                           DropdownMenuItem(
                             value: UtmHemisphere.south,
-                            child: Text('Nam (South)'),
+                            child: Text(l10n.south),
                           ),
                         ],
                         onChanged: _isUtmToWgs84
@@ -335,13 +299,9 @@ class _CoordinateConverterDialogState
               ),
               if (!_isUtmToWgs84) ...[
                 const SizedBox(height: 8),
-                const Text(
-                  'Khi chuyển WGS84 → UTM, Zone và bán cầu '
-                  'được tự động xác định từ Longitude/Latitude.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
+                Text(
+                  l10n.autoUtmHint,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],
               const SizedBox(height: 18),
@@ -350,17 +310,13 @@ class _CoordinateConverterDialogState
                   Expanded(
                     child: TextField(
                       controller: _firstController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(
+                      keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: _isUtmToWgs84
-                            ? 'Easting (X)'
-                            : 'Longitude',
-                        suffixText:
-                            _isUtmToWgs84 ? 'm' : '°',
+                        labelText: _isUtmToWgs84 ? 'Easting (X)' : 'Longitude',
+                        suffixText: _isUtmToWgs84 ? 'm' : '°',
                         border: const OutlineInputBorder(),
                       ),
                       onSubmitted: (_) => _convert(),
@@ -370,17 +326,13 @@ class _CoordinateConverterDialogState
                   Expanded(
                     child: TextField(
                       controller: _secondController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(
+                      keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: _isUtmToWgs84
-                            ? 'Northing (Y)'
-                            : 'Latitude',
-                        suffixText:
-                            _isUtmToWgs84 ? 'm' : '°',
+                        labelText: _isUtmToWgs84 ? 'Northing (Y)' : 'Latitude',
+                        suffixText: _isUtmToWgs84 ? 'm' : '°',
                         border: const OutlineInputBorder(),
                       ),
                       onSubmitted: (_) => _convert(),
@@ -394,13 +346,13 @@ class _CoordinateConverterDialogState
                   OutlinedButton.icon(
                     onPressed: _swapDirection,
                     icon: const Icon(Icons.swap_horiz),
-                    label: const Text('Đổi chiều'),
+                    label: Text(l10n.swapDirection),
                   ),
                   const Spacer(),
                   FilledButton.icon(
                     onPressed: _convert,
                     icon: const Icon(Icons.calculate_outlined),
-                    label: const Text('Chuyển đổi'),
+                    label: Text(l10n.convert),
                   ),
                 ],
               ),
@@ -409,20 +361,15 @@ class _CoordinateConverterDialogState
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .errorContainer,
+                    color: Theme.of(context).colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
                         Icons.error_outline,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onErrorContainer,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -446,13 +393,10 @@ class _CoordinateConverterDialogState
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFFA5D6A7),
-                    ),
+                    border: Border.all(color: const Color(0xFFA5D6A7)),
                   ),
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -499,14 +443,9 @@ class _CoordinateConverterDialogState
                 ),
               ],
               const SizedBox(height: 14),
-              const Text(
-                'Lưu ý: CAD cục bộ chưa thể chuyển trực tiếp '
-                'sang WGS84 nếu chưa biết CRS hoặc phép định vị '
-                'của bản vẽ.',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey,
-                ),
+              Text(
+                l10n.cadLocalConversionNote,
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
             ],
           ),
@@ -536,28 +475,16 @@ class _CrsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF7F9FB),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFFDDE3E8),
-        ),
+        border: Border.all(color: const Color(0xFFDDE3E8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
-          ),
+          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 3),
           Text(
-            epsgCode == null
-                ? crsName
-                : '$crsName • EPSG:$epsgCode',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+            epsgCode == null ? crsName : '$crsName • EPSG:$epsgCode',
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           child,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:autocad_googleearth/l10n/generated/app_localizations.dart';
 import 'package:autocad_googleearth/models/map_feature.dart';
 import 'package:autocad_googleearth/models/map_layer.dart';
 import 'package:autocad_googleearth/widgets/layer_georeference_dialog.dart';
@@ -25,6 +26,9 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) {
             return Scaffold(

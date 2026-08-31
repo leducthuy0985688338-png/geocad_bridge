@@ -615,6 +615,210 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Áp dụng'**
   String get apply;
+
+  /// No description provided for @sourceCoordinateSystem.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hệ tọa độ nguồn'**
+  String get sourceCoordinateSystem;
+
+  /// No description provided for @targetCoordinateSystem.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hệ tọa độ đích'**
+  String get targetCoordinateSystem;
+
+  /// No description provided for @autoUtmHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Khi chuyển WGS84 → UTM, Zone và bán cầu được tự động xác định từ Longitude/Latitude.'**
+  String get autoUtmHint;
+
+  /// No description provided for @swapDirection.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đổi chiều'**
+  String get swapDirection;
+
+  /// No description provided for @convert.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chuyển đổi'**
+  String get convert;
+
+  /// No description provided for @coordinateInputRequired.
+  ///
+  /// In vi, this message translates to:
+  /// **'Vui lòng nhập đủ hai giá trị tọa độ hợp lệ.'**
+  String get coordinateInputRequired;
+
+  /// No description provided for @wgs84Result.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả WGS84'**
+  String get wgs84Result;
+
+  /// No description provided for @utmResult.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả UTM'**
+  String get utmResult;
+
+  /// No description provided for @longitudeLatitudeRange.
+  ///
+  /// In vi, this message translates to:
+  /// **'Longitude phải trong [-180, 180] và Latitude trong [-90, 90].'**
+  String get longitudeLatitudeRange;
+
+  /// No description provided for @invalidCoordinates.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tọa độ nhập vào không hợp lệ.'**
+  String get invalidCoordinates;
+
+  /// No description provided for @coordinateConversionFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể chuyển đổi tọa độ. Hãy kiểm tra lại dữ liệu đầu vào.'**
+  String get coordinateConversionFailed;
+
+  /// No description provided for @cadLocalConversionNote.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lưu ý: CAD cục bộ chưa thể chuyển trực tiếp sang WGS84 nếu chưa biết CRS hoặc phép định vị của bản vẽ.'**
+  String get cadLocalConversionNote;
+
+  /// No description provided for @georeferenceCadDrawing.
+  ///
+  /// In vi, this message translates to:
+  /// **'Định vị bản vẽ CAD'**
+  String get georeferenceCadDrawing;
+
+  /// No description provided for @targetCrs.
+  ///
+  /// In vi, this message translates to:
+  /// **'CRS đích'**
+  String get targetCrs;
+
+  /// No description provided for @addControlPoint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thêm điểm khống chế'**
+  String get addControlPoint;
+
+  /// No description provided for @calculateGeoreferencePreview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tính thử phép định vị'**
+  String get calculateGeoreferencePreview;
+
+  /// No description provided for @georeferenceInstructions.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhập ít nhất hai điểm CAD và tọa độ UTM thực tương ứng. Với nhiều hơn hai điểm, ứng dụng dùng bình sai least-squares.'**
+  String get georeferenceInstructions;
+
+  /// No description provided for @createGeoreferencedLayer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tạo layer đã định vị'**
+  String get createGeoreferencedLayer;
+
+  /// No description provided for @invalidControlPointData.
+  ///
+  /// In vi, this message translates to:
+  /// **'Dữ liệu điểm khống chế không hợp lệ.'**
+  String get invalidControlPointData;
+
+  /// No description provided for @georeferenceCalculationFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể tính phép định vị. Hãy kiểm tra lại các điểm khống chế.'**
+  String get georeferenceCalculationFailed;
+
+  /// No description provided for @invalidNumber.
+  ///
+  /// In vi, this message translates to:
+  /// **'{label} không phải là số hợp lệ.'**
+  String invalidNumber(String label);
+
+  /// No description provided for @controlPoint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điểm khống chế {number}'**
+  String controlPoint(int number);
+
+  /// No description provided for @suspectedReview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nghi ngờ — cần kiểm tra'**
+  String get suspectedReview;
+
+  /// No description provided for @largestError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sai số lớn nhất'**
+  String get largestError;
+
+  /// No description provided for @removePoint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xóa điểm {number}'**
+  String removePoint(int number);
+
+  /// No description provided for @residualSummary.
+  ///
+  /// In vi, this message translates to:
+  /// **'ΔX: {deltaX} m • ΔY: {deltaY} m • Sai số: {error} m'**
+  String residualSummary(String deltaX, String deltaY, String error);
+
+  /// No description provided for @twoPointTransform.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phép biến đổi 2 điểm'**
+  String get twoPointTransform;
+
+  /// No description provided for @leastSquaresAdjustment.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bình sai {count} điểm'**
+  String leastSquaresAdjustment(int count);
+
+  /// No description provided for @maxResidualSummary.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sai số lớn nhất: {error} m (điểm {number})'**
+  String maxResidualSummary(String error, int number);
+
+  /// No description provided for @outlierNotApplicable.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hai điểm: không áp dụng phát hiện outlier.'**
+  String get outlierNotApplicable;
+
+  /// No description provided for @outlierInsufficientSample.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa đủ mẫu để đánh giá outlier; điểm lớn nhất chỉ mang tính tham khảo.'**
+  String get outlierInsufficientSample;
+
+  /// No description provided for @outlierNoRelativeAnomaly.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không phát hiện bất thường tương đối trong các residual.'**
+  String get outlierNoRelativeAnomaly;
+
+  /// No description provided for @outlierReviewSuggested.
+  ///
+  /// In vi, this message translates to:
+  /// **'Có điểm nghi ngờ — hãy kiểm tra hoặc chỉnh sửa thủ công.'**
+  String get outlierReviewSuggested;
+
+  /// No description provided for @outlierMultipleLargeResiduals.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhiều residual cần được kiểm tra tổng thể.'**
+  String get outlierMultipleLargeResiduals;
 }
 
 class _AppLocalizationsDelegate

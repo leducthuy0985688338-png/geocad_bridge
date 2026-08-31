@@ -168,5 +168,90 @@
     "coordinateSystem":  "ລະບົບພິກັດ",
     "localCadUndefined":  "CAD ທ້ອງຖິ່ນ / ຍັງບໍ່ກຳນົດ",
     "sourceCrsDeclarationNote":  "ໝາຍເຫດ: ການດຳເນີນການນີ້ພຽງແຕ່ກຳນົດ CRS ຂອງຊັ້ນ ແລະ ບໍ່ໄດ້ປ່ຽນຄ່າພິກັດ X/Y ທີ່ມີຢູ່.",
-    "apply":  "ນຳໃຊ້"
+    "apply":  "ນຳໃຊ້",
+"sourceCoordinateSystem": "ລະບົບພິກັດຕົ້ນທາງ",
+    "targetCoordinateSystem": "ລະບົບພິກັດປາຍທາງ",
+    "autoUtmHint": "ເມື່ອແປງ WGS84 → UTM, Zone ແລະ ຊີກໂລກຈະຖືກກຳນົດອັດຕະໂນມັດຈາກ Longitude/Latitude.",
+    "swapDirection": "ສະຫຼັບທິດທາງ",
+    "convert": "ແປງ",
+    "coordinateInputRequired": "ກະລຸນາປ້ອນຄ່າພິກັດທີ່ຖືກຕ້ອງສອງຄ່າ.",
+    "wgs84Result": "ຜົນ WGS84",
+    "utmResult": "ຜົນ UTM",
+    "longitudeLatitudeRange": "Longitude ຕ້ອງຢູ່ໃນ [-180, 180] ແລະ Latitude ຢູ່ໃນ [-90, 90].",
+    "invalidCoordinates": "ຄ່າພິກັດທີ່ປ້ອນບໍ່ຖືກຕ້ອງ.",
+    "coordinateConversionFailed": "ບໍ່ສາມາດແປງພິກັດໄດ້. ກະລຸນາກວດສອບຂໍ້ມູນປ້ອນ.",
+    "cadLocalConversionNote": "ໝາຍເຫດ: ພິກັດ CAD ທ້ອງຖິ່ນຍັງບໍ່ສາມາດແປງໄປ WGS84 ໂດຍກົງ ຈົນກວ່າຈະຮູ້ CRS ຫຼື ການອ້າງອີງຕຳແໜ່ງຂອງແບບ.",
+    "georeferenceCadDrawing": "ອ້າງອີງຕຳແໜ່ງແບບ CAD",
+    "targetCrs": "CRS ປາຍທາງ",
+    "addControlPoint": "ເພີ່ມຈຸດຄວບຄຸມ",
+    "calculateGeoreferencePreview": "ຄຳນວນຕົວຢ່າງການອ້າງອີງຕຳແໜ່ງ",
+    "georeferenceInstructions": "ປ້ອນຢ່າງໜ້ອຍສອງຈຸດ CAD ແລະ ພິກັດ UTM ຈິງທີ່ກົງກັນ. ຖ້າມີຫຼາຍກວ່າສອງຈຸດ ແອັບຈະໃຊ້ການປັບແບບ least-squares.",
+    "createGeoreferencedLayer": "ສ້າງຊັ້ນທີ່ອ້າງອີງຕຳແໜ່ງແລ້ວ",
+    "invalidControlPointData": "ຂໍ້ມູນຈຸດຄວບຄຸມບໍ່ຖືກຕ້ອງ.",
+    "georeferenceCalculationFailed": "ບໍ່ສາມາດຄຳນວນການອ້າງອີງຕຳແໜ່ງໄດ້. ກະລຸນາກວດສອບຈຸດຄວບຄຸມ.",
+    "invalidNumber": "{label} ບໍ່ແມ່ນຕົວເລກທີ່ຖືກຕ້ອງ.",
+    "@invalidNumber": {
+        "placeholders": {
+            "label": {
+                "type": "String"
+            }
+        }
+    },
+    "controlPoint": "ຈຸດຄວບຄຸມ {number}",
+    "@controlPoint": {
+        "placeholders": {
+            "number": {
+                "type": "int"
+            }
+        }
+    },
+    "suspectedReview": "ສົງໄສ — ຕ້ອງກວດສອບ",
+    "largestError": "ຄ່າຜິດພາດສູງສຸດ",
+    "removePoint": "ລຶບຈຸດ {number}",
+    "@removePoint": {
+        "placeholders": {
+            "number": {
+                "type": "int"
+            }
+        }
+    },
+    "residualSummary": "ΔX: {deltaX} m • ΔY: {deltaY} m • ຄ່າຜິດພາດ: {error} m",
+    "@residualSummary": {
+        "placeholders": {
+            "deltaX": {
+                "type": "String"
+            },
+            "deltaY": {
+                "type": "String"
+            },
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "twoPointTransform": "ການແປງ 2 ຈຸດ",
+    "leastSquaresAdjustment": "ການປັບ least-squares ດ້ວຍ {count} ຈຸດ",
+    "@leastSquaresAdjustment": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "maxResidualSummary": "ຄ່າຜິດພາດສູງສຸດ: {error} m (ຈຸດ {number})",
+    "@maxResidualSummary": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            },
+            "number": {
+                "type": "int"
+            }
+        }
+    },
+    "outlierNotApplicable": "ສອງຈຸດ: ບໍ່ສາມາດໃຊ້ການກວດຫາ outlier.",
+    "outlierInsufficientSample": "ຕົວຢ່າງບໍ່ພຽງພໍສຳລັບປະເມີນ outlier; ຈຸດທີ່ໃຫຍ່ສຸດໃຊ້ເປັນຂໍ້ອ້າງອີງເທົ່ານັ້ນ.",
+    "outlierNoRelativeAnomaly": "ບໍ່ພົບຄວາມຜິດປົກກະຕິສຳພັນໃນ residual.",
+    "outlierReviewSuggested": "ພົບຈຸດທີ່ໜ້າສົງໄສ — ກະລຸນາກວດສອບ ຫຼື ແກ້ໄຂດ້ວຍຕົນເອງ.",
+    "outlierMultipleLargeResiduals": "ມີ residual ຫຼາຍຄ່າທີ່ຕ້ອງກວດສອບໂດຍລວມ."
 }

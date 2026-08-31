@@ -294,4 +294,129 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get apply => 'Apply';
+
+  @override
+  String get sourceCoordinateSystem => 'Source coordinate system';
+
+  @override
+  String get targetCoordinateSystem => 'Target coordinate system';
+
+  @override
+  String get autoUtmHint =>
+      'When converting WGS84 → UTM, the Zone and hemisphere are determined automatically from Longitude/Latitude.';
+
+  @override
+  String get swapDirection => 'Swap direction';
+
+  @override
+  String get convert => 'Convert';
+
+  @override
+  String get coordinateInputRequired => 'Enter two valid coordinate values.';
+
+  @override
+  String get wgs84Result => 'WGS84 result';
+
+  @override
+  String get utmResult => 'UTM result';
+
+  @override
+  String get longitudeLatitudeRange =>
+      'Longitude must be within [-180, 180] and Latitude within [-90, 90].';
+
+  @override
+  String get invalidCoordinates => 'The entered coordinates are invalid.';
+
+  @override
+  String get coordinateConversionFailed =>
+      'Could not convert the coordinates. Check the input data and try again.';
+
+  @override
+  String get cadLocalConversionNote =>
+      'Note: Local CAD coordinates cannot be converted directly to WGS84 until the drawing CRS or georeferencing transform is known.';
+
+  @override
+  String get georeferenceCadDrawing => 'Georeference CAD drawing';
+
+  @override
+  String get targetCrs => 'Target CRS';
+
+  @override
+  String get addControlPoint => 'Add control point';
+
+  @override
+  String get calculateGeoreferencePreview => 'Calculate georeference preview';
+
+  @override
+  String get georeferenceInstructions =>
+      'Enter at least two CAD points and their corresponding real UTM coordinates. With more than two points, the app uses least-squares adjustment.';
+
+  @override
+  String get createGeoreferencedLayer => 'Create georeferenced layer';
+
+  @override
+  String get invalidControlPointData => 'The control-point data is invalid.';
+
+  @override
+  String get georeferenceCalculationFailed =>
+      'Could not calculate the georeferencing transform. Check the control points.';
+
+  @override
+  String invalidNumber(String label) {
+    return '$label is not a valid number.';
+  }
+
+  @override
+  String controlPoint(int number) {
+    return 'Control point $number';
+  }
+
+  @override
+  String get suspectedReview => 'Suspected — review required';
+
+  @override
+  String get largestError => 'Largest error';
+
+  @override
+  String removePoint(int number) {
+    return 'Remove point $number';
+  }
+
+  @override
+  String residualSummary(String deltaX, String deltaY, String error) {
+    return 'ΔX: $deltaX m • ΔY: $deltaY m • Error: $error m';
+  }
+
+  @override
+  String get twoPointTransform => '2-point transform';
+
+  @override
+  String leastSquaresAdjustment(int count) {
+    return 'Least-squares adjustment with $count points';
+  }
+
+  @override
+  String maxResidualSummary(String error, int number) {
+    return 'Largest error: $error m (point $number)';
+  }
+
+  @override
+  String get outlierNotApplicable =>
+      'Two points: outlier detection is not applicable.';
+
+  @override
+  String get outlierInsufficientSample =>
+      'Not enough samples to assess outliers; the largest point is for reference only.';
+
+  @override
+  String get outlierNoRelativeAnomaly =>
+      'No relative anomaly detected in the residuals.';
+
+  @override
+  String get outlierReviewSuggested =>
+      'A suspicious point was detected — review or edit it manually.';
+
+  @override
+  String get outlierMultipleLargeResiduals =>
+      'Multiple residuals require an overall review.';
 }

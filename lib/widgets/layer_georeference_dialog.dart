@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
+
 import '../models/coordinate_reference_system.dart';
 import '../models/map_feature.dart';
 import '../models/map_layer.dart';
@@ -83,7 +85,7 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
   double _read(TextEditingController controller, String label) {
     final value = double.tryParse(controller.text.trim().replaceAll(',', '.'));
     if (value == null) {
-      throw ArgumentError('$label không phải là số hợp lệ.');
+      throw ArgumentError(AppLocalizations.of(context).invalidNumber(label));
     }
     return value;
   }
@@ -167,15 +169,16 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
   String _friendlyError(Object error) {
     if (error is ArgumentError) {
       return error.message?.toString() ??
-          'Dữ liệu điểm khống chế không hợp lệ.';
+          AppLocalizations.of(context).invalidControlPointData;
     }
     if (error is StateError) return error.message;
-    return 'Không thể tính phép định vị. Hãy kiểm tra lại các điểm khống chế.';
+    return AppLocalizations.of(context).georeferenceCalculationFailed;
   }
 
   @override
   Widget build(BuildContext context) {
     final targetCrs = _targetCrs;
+    final l10n = AppLocalizations.of(context);
 
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
@@ -199,9 +202,9 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Định vị bản vẽ CAD',
-                          style: TextStyle(
+                        Text(
+                          l10n.georeferenceCadDrawing,
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -217,16 +220,16 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Đóng',
+                    tooltip: l10n.close,
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
-              const Text(
-                'CRS đích',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                l10n.targetCrs,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               Row(
@@ -235,8 +238,8 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
                     child: DropdownButtonFormField<int>(
                       key: const Key('georeference-zone'),
                       initialValue: _utmZone,
-                      decoration: const InputDecoration(
-                        labelText: 'UTM Zone',
+                      decoration: InputDecoration(
+                        labelText: l10n.utmZone,
                         border: OutlineInputBorder(),
                       ),
                       items: List.generate(
@@ -261,18 +264,18 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
                     child: DropdownButtonFormField<UtmHemisphere>(
                       key: const Key('georeference-hemisphere'),
                       initialValue: _hemisphere,
-                      decoration: const InputDecoration(
-                        labelText: 'Bán cầu',
+                      decoration: InputDecoration(
+                        labelText: l10n.hemisphere,
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: UtmHemisphere.north,
-                          child: Text('Bắc (North)'),
+                          child: Text(l10n.north),
                         ),
                         DropdownMenuItem(
                           value: UtmHemisphere.south,
-                          child: Text('Nam (South)'),
+                          child: Text(l10n.south),
                         ),
                       ],
                       onChanged: (value) {
@@ -322,7 +325,7 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
                   key: const Key('add-control-point'),
                   onPressed: _addControlPoint,
                   icon: const Icon(Icons.add),
-                  label: const Text('Thêm điểm khống chế'),
+                  label: Text(l10n.addControlPoint),
                 ),
               ),
               const SizedBox(height: 18),
@@ -330,7 +333,7 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
                 key: const Key('calculate-georeference-preview'),
                 onPressed: _calculatePreview,
                 icon: const Icon(Icons.calculate_outlined),
-                label: const Text('Tính thử phép định vị'),
+                label: Text(l10n.calculateGeoreferencePreview),
               ),
               if (_preview != null) ...[
                 const SizedBox(height: 14),
@@ -354,24 +357,23 @@ class _LayerGeoreferenceDialogState extends State<LayerGeoreferenceDialog> {
                 ),
               ],
               const SizedBox(height: 18),
-              const Text(
-                'Nhập ít nhất hai điểm CAD và tọa độ UTM thực tương ứng. '
-                'Với nhiều hơn hai điểm, ứng dụng dùng bình sai least-squares.',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
+              Text(
+                l10n.georeferenceInstructions,
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
               const SizedBox(height: 18),
               Row(
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Hủy'),
+                    child: Text(l10n.cancel),
                   ),
                   const Spacer(),
                   FilledButton.icon(
                     key: const Key('apply-georeference'),
                     onPressed: _apply,
                     icon: const Icon(Icons.add_location_alt),
-                    label: const Text('Tạo layer đã định vị'),
+                    label: Text(l10n.createGeoreferencedLayer),
                   ),
                 ],
               ),
@@ -464,6 +466,7 @@ class _ControlPointEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final number = index + 1;
+    final l10n = AppLocalizations.of(context);
     final highlightColor = isSuspected
         ? const Color(0xFFD84315)
         : isUniqueWorst
@@ -488,24 +491,24 @@ class _ControlPointEditor extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Điểm khống chế $number',
+                  l10n.controlPoint(number),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
               if (isSuspected)
-                const Text(
-                  'Nghi ngờ — cần kiểm tra',
+                Text(
+                  l10n.suspectedReview,
                   key: Key('suspected-point-label'),
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Color(0xFFD84315),
                     fontWeight: FontWeight.bold,
                   ),
                 )
               else if (isUniqueWorst)
-                const Text(
-                  'Sai số lớn nhất',
+                Text(
+                  l10n.largestError,
                   key: Key('worst-point-label'),
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Color(0xFFF57F17),
                     fontWeight: FontWeight.w600,
                   ),
@@ -514,7 +517,7 @@ class _ControlPointEditor extends StatelessWidget {
               if (canRemove)
                 IconButton(
                   key: Key('remove-control-point-$index'),
-                  tooltip: 'Xóa điểm $number',
+                  tooltip: l10n.removePoint(number),
                   onPressed: onRemove,
                   icon: const Icon(Icons.delete_outline),
                 ),
@@ -563,9 +566,11 @@ class _ControlPointEditor extends StatelessWidget {
           if (residual != null) ...[
             const SizedBox(height: 10),
             Text(
-              'ΔX: ${residual!.deltaX.toStringAsFixed(4)} m • '
-              'ΔY: ${residual!.deltaY.toStringAsFixed(4)} m • '
-              'Sai số: ${residual!.planarError.toStringAsFixed(4)} m',
+              l10n.residualSummary(
+                residual!.deltaX.toStringAsFixed(4),
+                residual!.deltaY.toStringAsFixed(4),
+                residual!.planarError.toStringAsFixed(4),
+              ),
               key: Key('residual-$index'),
               style: const TextStyle(fontSize: 12, color: Color(0xFF455A64)),
             ),
@@ -584,6 +589,7 @@ class _FitSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assessment = fit.assessment;
+    final l10n = AppLocalizations.of(context);
     return Container(
       key: const Key('georeference-fit-summary'),
       padding: const EdgeInsets.all(14),
@@ -597,8 +603,8 @@ class _FitSummary extends StatelessWidget {
         children: [
           Text(
             fit.controlPointCount == 2
-                ? 'Phép biến đổi 2 điểm'
-                : 'Bình sai ${fit.controlPointCount} điểm',
+                ? l10n.twoPointTransform
+                : l10n.leastSquaresAdjustment(fit.controlPointCount),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Color(0xFF2E7D32),
@@ -617,8 +623,10 @@ class _FitSummary extends StatelessWidget {
           ),
           Text('RMSE: ${fit.rmse.toStringAsFixed(4)} m'),
           Text(
-            'Sai số lớn nhất: ${fit.maxResidual.planarError.toStringAsFixed(4)} m '
-            '(điểm ${fit.maxResidualIndex + 1})',
+            l10n.maxResidualSummary(
+              fit.maxResidual.planarError.toStringAsFixed(4),
+              fit.maxResidualIndex + 1,
+            ),
           ),
           const SizedBox(height: 8),
           _QualityMessage(assessment: assessment),
@@ -635,25 +643,26 @@ class _QualityMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final (text, color) = switch (assessment.status) {
       GeoreferenceReviewStatus.notApplicable => (
-        'Hai điểm: không áp dụng phát hiện outlier.',
+        l10n.outlierNotApplicable,
         const Color(0xFF455A64),
       ),
       GeoreferenceReviewStatus.insufficientSample => (
-        'Chưa đủ mẫu để đánh giá outlier; điểm lớn nhất chỉ mang tính tham khảo.',
+        l10n.outlierInsufficientSample,
         const Color(0xFFF57F17),
       ),
       GeoreferenceReviewStatus.noRelativeAnomaly => (
-        'Không phát hiện bất thường tương đối trong các residual.',
+        l10n.outlierNoRelativeAnomaly,
         const Color(0xFF2E7D32),
       ),
       GeoreferenceReviewStatus.reviewSuggested => (
-        'Có điểm nghi ngờ — hãy kiểm tra hoặc chỉnh sửa thủ công.',
+        l10n.outlierReviewSuggested,
         const Color(0xFFD84315),
       ),
       GeoreferenceReviewStatus.multipleLargeResiduals => (
-        'Nhiều residual cần được kiểm tra tổng thể.',
+        l10n.outlierMultipleLargeResiduals,
         const Color(0xFFD84315),
       ),
     };

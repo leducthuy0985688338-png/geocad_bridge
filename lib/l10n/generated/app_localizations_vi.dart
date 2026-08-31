@@ -295,4 +295,130 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get apply => 'Áp dụng';
+
+  @override
+  String get sourceCoordinateSystem => 'Hệ tọa độ nguồn';
+
+  @override
+  String get targetCoordinateSystem => 'Hệ tọa độ đích';
+
+  @override
+  String get autoUtmHint =>
+      'Khi chuyển WGS84 → UTM, Zone và bán cầu được tự động xác định từ Longitude/Latitude.';
+
+  @override
+  String get swapDirection => 'Đổi chiều';
+
+  @override
+  String get convert => 'Chuyển đổi';
+
+  @override
+  String get coordinateInputRequired =>
+      'Vui lòng nhập đủ hai giá trị tọa độ hợp lệ.';
+
+  @override
+  String get wgs84Result => 'Kết quả WGS84';
+
+  @override
+  String get utmResult => 'Kết quả UTM';
+
+  @override
+  String get longitudeLatitudeRange =>
+      'Longitude phải trong [-180, 180] và Latitude trong [-90, 90].';
+
+  @override
+  String get invalidCoordinates => 'Tọa độ nhập vào không hợp lệ.';
+
+  @override
+  String get coordinateConversionFailed =>
+      'Không thể chuyển đổi tọa độ. Hãy kiểm tra lại dữ liệu đầu vào.';
+
+  @override
+  String get cadLocalConversionNote =>
+      'Lưu ý: CAD cục bộ chưa thể chuyển trực tiếp sang WGS84 nếu chưa biết CRS hoặc phép định vị của bản vẽ.';
+
+  @override
+  String get georeferenceCadDrawing => 'Định vị bản vẽ CAD';
+
+  @override
+  String get targetCrs => 'CRS đích';
+
+  @override
+  String get addControlPoint => 'Thêm điểm khống chế';
+
+  @override
+  String get calculateGeoreferencePreview => 'Tính thử phép định vị';
+
+  @override
+  String get georeferenceInstructions =>
+      'Nhập ít nhất hai điểm CAD và tọa độ UTM thực tương ứng. Với nhiều hơn hai điểm, ứng dụng dùng bình sai least-squares.';
+
+  @override
+  String get createGeoreferencedLayer => 'Tạo layer đã định vị';
+
+  @override
+  String get invalidControlPointData => 'Dữ liệu điểm khống chế không hợp lệ.';
+
+  @override
+  String get georeferenceCalculationFailed =>
+      'Không thể tính phép định vị. Hãy kiểm tra lại các điểm khống chế.';
+
+  @override
+  String invalidNumber(String label) {
+    return '$label không phải là số hợp lệ.';
+  }
+
+  @override
+  String controlPoint(int number) {
+    return 'Điểm khống chế $number';
+  }
+
+  @override
+  String get suspectedReview => 'Nghi ngờ — cần kiểm tra';
+
+  @override
+  String get largestError => 'Sai số lớn nhất';
+
+  @override
+  String removePoint(int number) {
+    return 'Xóa điểm $number';
+  }
+
+  @override
+  String residualSummary(String deltaX, String deltaY, String error) {
+    return 'ΔX: $deltaX m • ΔY: $deltaY m • Sai số: $error m';
+  }
+
+  @override
+  String get twoPointTransform => 'Phép biến đổi 2 điểm';
+
+  @override
+  String leastSquaresAdjustment(int count) {
+    return 'Bình sai $count điểm';
+  }
+
+  @override
+  String maxResidualSummary(String error, int number) {
+    return 'Sai số lớn nhất: $error m (điểm $number)';
+  }
+
+  @override
+  String get outlierNotApplicable =>
+      'Hai điểm: không áp dụng phát hiện outlier.';
+
+  @override
+  String get outlierInsufficientSample =>
+      'Chưa đủ mẫu để đánh giá outlier; điểm lớn nhất chỉ mang tính tham khảo.';
+
+  @override
+  String get outlierNoRelativeAnomaly =>
+      'Không phát hiện bất thường tương đối trong các residual.';
+
+  @override
+  String get outlierReviewSuggested =>
+      'Có điểm nghi ngờ — hãy kiểm tra hoặc chỉnh sửa thủ công.';
+
+  @override
+  String get outlierMultipleLargeResiduals =>
+      'Nhiều residual cần được kiểm tra tổng thể.';
 }

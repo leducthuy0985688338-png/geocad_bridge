@@ -168,5 +168,90 @@
     "coordinateSystem":  "Hệ tọa độ",
     "localCadUndefined":  "CAD cục bộ / chưa xác định",
     "sourceCrsDeclarationNote":  "Lưu ý: thao tác này chỉ khai báo CRS của layer, không tự thay đổi các giá trị tọa độ X/Y đang có.",
-    "apply":  "Áp dụng"
+    "apply":  "Áp dụng",
+"sourceCoordinateSystem": "Hệ tọa độ nguồn",
+    "targetCoordinateSystem": "Hệ tọa độ đích",
+    "autoUtmHint": "Khi chuyển WGS84 → UTM, Zone và bán cầu được tự động xác định từ Longitude/Latitude.",
+    "swapDirection": "Đổi chiều",
+    "convert": "Chuyển đổi",
+    "coordinateInputRequired": "Vui lòng nhập đủ hai giá trị tọa độ hợp lệ.",
+    "wgs84Result": "Kết quả WGS84",
+    "utmResult": "Kết quả UTM",
+    "longitudeLatitudeRange": "Longitude phải trong [-180, 180] và Latitude trong [-90, 90].",
+    "invalidCoordinates": "Tọa độ nhập vào không hợp lệ.",
+    "coordinateConversionFailed": "Không thể chuyển đổi tọa độ. Hãy kiểm tra lại dữ liệu đầu vào.",
+    "cadLocalConversionNote": "Lưu ý: CAD cục bộ chưa thể chuyển trực tiếp sang WGS84 nếu chưa biết CRS hoặc phép định vị của bản vẽ.",
+    "georeferenceCadDrawing": "Định vị bản vẽ CAD",
+    "targetCrs": "CRS đích",
+    "addControlPoint": "Thêm điểm khống chế",
+    "calculateGeoreferencePreview": "Tính thử phép định vị",
+    "georeferenceInstructions": "Nhập ít nhất hai điểm CAD và tọa độ UTM thực tương ứng. Với nhiều hơn hai điểm, ứng dụng dùng bình sai least-squares.",
+    "createGeoreferencedLayer": "Tạo layer đã định vị",
+    "invalidControlPointData": "Dữ liệu điểm khống chế không hợp lệ.",
+    "georeferenceCalculationFailed": "Không thể tính phép định vị. Hãy kiểm tra lại các điểm khống chế.",
+    "invalidNumber": "{label} không phải là số hợp lệ.",
+    "@invalidNumber": {
+        "placeholders": {
+            "label": {
+                "type": "String"
+            }
+        }
+    },
+    "controlPoint": "Điểm khống chế {number}",
+    "@controlPoint": {
+        "placeholders": {
+            "number": {
+                "type": "int"
+            }
+        }
+    },
+    "suspectedReview": "Nghi ngờ — cần kiểm tra",
+    "largestError": "Sai số lớn nhất",
+    "removePoint": "Xóa điểm {number}",
+    "@removePoint": {
+        "placeholders": {
+            "number": {
+                "type": "int"
+            }
+        }
+    },
+    "residualSummary": "ΔX: {deltaX} m • ΔY: {deltaY} m • Sai số: {error} m",
+    "@residualSummary": {
+        "placeholders": {
+            "deltaX": {
+                "type": "String"
+            },
+            "deltaY": {
+                "type": "String"
+            },
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "twoPointTransform": "Phép biến đổi 2 điểm",
+    "leastSquaresAdjustment": "Bình sai {count} điểm",
+    "@leastSquaresAdjustment": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "maxResidualSummary": "Sai số lớn nhất: {error} m (điểm {number})",
+    "@maxResidualSummary": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            },
+            "number": {
+                "type": "int"
+            }
+        }
+    },
+    "outlierNotApplicable": "Hai điểm: không áp dụng phát hiện outlier.",
+    "outlierInsufficientSample": "Chưa đủ mẫu để đánh giá outlier; điểm lớn nhất chỉ mang tính tham khảo.",
+    "outlierNoRelativeAnomaly": "Không phát hiện bất thường tương đối trong các residual.",
+    "outlierReviewSuggested": "Có điểm nghi ngờ — hãy kiểm tra hoặc chỉnh sửa thủ công.",
+    "outlierMultipleLargeResiduals": "Nhiều residual cần được kiểm tra tổng thể."
 }
