@@ -397,6 +397,65 @@ void main() {
     expect(result.diagnostics.hasIssues, isFalse);
   });
 
+  group('KML inline style parsing', () {
+    test('parses LineStyle color opacity width and styleUrl', () {
+      const kml = '''
+<kml><Placemark>
+<name>Tuyến style</name>
+<styleUrl>#shared-line</styleUrl>
+<Style><LineStyle><color>800000ff</color><width>2.5</width></LineStyle></Style>
+<LineString><coordinates>106,16 107,17</coordinates></LineString>
+</Placemark></kml>
+''';
+
+      final feature = service.parseString(kml).features.single;
+
+      expect(feature.properties['kml.styleUrl'], '#shared-line');
+      expect(feature.properties['style.strokeColor'], '#FF0000');
+      expect(feature.properties['style.strokeOpacity'], '0.501961');
+      expect(feature.properties['style.strokeWidth'], '2.5');
+    });
+
+    test('parses PolyStyle color alpha fill and outline', () {
+      const kml = '''
+<kml><Placemark>
+<Style><PolyStyle><color>4000ff00</color><fill>0</fill><outline>1</outline></PolyStyle></Style>
+<Polygon><outerBoundaryIs><LinearRing>
+<coordinates>106,16 107,16 107,17 106,16</coordinates>
+</LinearRing></outerBoundaryIs></Polygon>
+</Placemark></kml>
+''';
+
+      final feature = service.parseString(kml).features.single;
+
+      expect(feature.properties['style.fillColor'], '#00FF00');
+      expect(feature.properties['style.fillOpacity'], '0.25098');
+      expect(feature.properties['style.fill'], '0');
+      expect(feature.properties['style.outline'], '1');
+    });
+
+    test('keeps inline style and Unicode user metadata separate', () {
+      const kml = '''
+<kml><Placemark>
+<name>Việt Nam – ລາວ – English</name>
+<ExtendedData><Data name="owner"><value>Đội khảo sát – ທີມສຳຫຼວດ – Survey Team</value></Data></ExtendedData>
+<Style><LineStyle><color>ff332211</color><width>3</width></LineStyle></Style>
+<LineString><coordinates>106,16 107,17</coordinates></LineString>
+</Placemark></kml>
+''';
+
+      final feature = service.parseString(kml).features.single;
+
+      expect(
+        feature.properties['owner'],
+        'Đội khảo sát – ທີມສຳຫຼວດ – Survey Team',
+      );
+      expect(feature.properties['style.strokeColor'], '#112233');
+      expect(feature.properties['style.strokeOpacity'], '1');
+      expect(feature.properties['style.strokeWidth'], '3');
+    });
+  });
+
   test('structurally invalid XML remains a whole-document failure', () {
     expect(
       () => service.parseString('<kml><Placemark>'),

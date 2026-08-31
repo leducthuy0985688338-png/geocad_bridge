@@ -275,7 +275,7 @@ class DxfExportService {
     switch (feature.type) {
       case MapFeatureType.point:
         _requireCount(layer, feature, exactly: 1);
-        _entityStart(lines, 'POINT', layerName);
+        _entityStart(lines, 'POINT', layerName, feature: feature);
         _coordinate(
           lines,
           feature.coordinates.single,
@@ -286,7 +286,7 @@ class DxfExportService {
         );
       case MapFeatureType.line:
         _requireCount(layer, feature, exactly: 2);
-        _entityStart(lines, 'LINE', layerName);
+        _entityStart(lines, 'LINE', layerName, feature: feature);
         _coordinate(
           lines,
           feature.coordinates[0],
@@ -306,12 +306,19 @@ class DxfExportService {
       case MapFeatureType.polyline:
         _requireCount(layer, feature, minimum: 2);
         _rejectPolylineElevation(layer, feature);
-        _polyline(lines, feature.coordinates, layerName, closed: false);
+        _polyline(
+          lines,
+          feature,
+          feature.coordinates,
+          layerName,
+          closed: false,
+        );
       case MapFeatureType.polygon:
         _requireCount(layer, feature, minimum: 3);
         _rejectPolylineElevation(layer, feature);
         _polyline(
           lines,
+          feature,
           _canonicalPolygon(layer, feature),
           layerName,
           closed: true,
@@ -331,18 +338,37 @@ class DxfExportService {
     return lines.join(lineEnding);
   }
 
-  void _entityStart(List<String> lines, String entity, String layerName) {
+  void _entityStart(
+    List<String> lines,
+    String entity,
+    String layerName, {
+    MapFeature? feature,
+  }) {
     _pair(lines, 0, entity);
     _pair(lines, 8, layerName);
+    if (feature != null) {
+      _writeEntityColor(lines, feature);
+    }
+  }
+
+  void _writeEntityColor(List<String> lines, MapFeature feature) {
+    final rawColorIndex = feature.properties['cad.colorIndex']?.trim();
+    if (rawColorIndex == null || rawColorIndex.isEmpty) return;
+
+    final colorIndex = int.tryParse(rawColorIndex);
+    if (colorIndex == null || colorIndex < -255 || colorIndex > 255) return;
+
+    _pair(lines, 62, colorIndex);
   }
 
   void _polyline(
     List<String> lines,
+    MapFeature feature,
     List<MapCoordinate> coordinates,
     String layerName, {
     required bool closed,
   }) {
-    _entityStart(lines, 'POLYLINE', layerName);
+    _entityStart(lines, 'POLYLINE', layerName, feature: feature);
     _pair(lines, 66, 1);
     _pair(lines, 10, '0');
     _pair(lines, 20, '0');
@@ -409,7 +435,7 @@ class DxfExportService {
       fallback: 0,
     );
 
-    _entityStart(lines, 'TEXT', layerName);
+    _entityStart(lines, 'TEXT', layerName, feature: feature);
     _coordinate(
       lines,
       feature.coordinates.single,

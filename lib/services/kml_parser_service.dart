@@ -140,6 +140,7 @@ class KmlParserService {
       final name = _firstChildText(placemark, 'name') ?? '';
       final description = _firstChildText(placemark, 'description');
       final baseProperties = _readExtendedData(placemark);
+      _readPlacemarkStyle(placemark, baseProperties);
       final geometryEntries = _geometryEntries(placemark);
 
       for (final entry in geometryEntries) {
@@ -559,6 +560,91 @@ class KmlParserService {
       geometryType,
       'tọa độ #$tupleIndex "$tuple" không hợp lệ: $message',
     );
+  }
+
+  void _readPlacemarkStyle(
+    XmlElement placemark,
+    Map<String, String> properties,
+  ) {
+    final styleUrl = _firstChildText(placemark, 'styleUrl');
+    if (styleUrl != null) {
+      properties['kml.styleUrl'] = styleUrl;
+    }
+
+    final style = _firstDirectChild(placemark, 'Style');
+    if (style == null) return;
+
+    final lineStyle = _firstDirectChild(style, 'LineStyle');
+    if (lineStyle != null) {
+      final color = _firstChildText(lineStyle, 'color');
+      if (color != null) {
+        _readKmlColor(
+          color,
+          properties: properties,
+          colorKey: 'style.strokeColor',
+          opacityKey: 'style.strokeOpacity',
+        );
+      }
+
+      final width = _firstChildText(lineStyle, 'width');
+      if (width != null) {
+        final parsedWidth = double.tryParse(width);
+        if (parsedWidth != null && parsedWidth.isFinite && parsedWidth >= 0) {
+          properties['style.strokeWidth'] = _formatStyleNumber(parsedWidth);
+        }
+      }
+    }
+
+    final polyStyle = _firstDirectChild(style, 'PolyStyle');
+    if (polyStyle != null) {
+      final color = _firstChildText(polyStyle, 'color');
+      if (color != null) {
+        _readKmlColor(
+          color,
+          properties: properties,
+          colorKey: 'style.fillColor',
+          opacityKey: 'style.fillOpacity',
+        );
+      }
+
+      final fill = _firstChildText(polyStyle, 'fill');
+      if (fill == '0' || fill == '1') {
+        properties['style.fill'] = fill!;
+      }
+
+      final outline = _firstChildText(polyStyle, 'outline');
+      if (outline == '0' || outline == '1') {
+        properties['style.outline'] = outline!;
+      }
+    }
+  }
+
+  void _readKmlColor(
+    String raw, {
+    required Map<String, String> properties,
+    required String colorKey,
+    required String opacityKey,
+  }) {
+    final value = raw.trim();
+    if (!RegExp(r'^[0-9A-Fa-f]{8}$').hasMatch(value)) return;
+
+    final alpha = int.parse(value.substring(0, 2), radix: 16);
+    final blue = value.substring(2, 4);
+    final green = value.substring(4, 6);
+    final red = value.substring(6, 8);
+
+    properties[colorKey] =
+        '#${red.toUpperCase()}${green.toUpperCase()}${blue.toUpperCase()}';
+    properties[opacityKey] = _formatStyleNumber(alpha / 255);
+  }
+
+  String _formatStyleNumber(double value) {
+    if (value == 0) return '0';
+    if (value == 1) return '1';
+    return value
+        .toStringAsFixed(6)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   Map<String, String> _readExtendedData(XmlElement placemark) {

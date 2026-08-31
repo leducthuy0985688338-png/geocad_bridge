@@ -870,6 +870,105 @@ $label
     }
   });
 
+  group('DXF entity color metadata', () {
+    test('preserves ACI group 62 as cad.colorIndex', () async {
+      final result = await parseEntities('''
+0
+LINE
+8
+COLOR-ACI
+62
+3
+10
+0
+20
+0
+11
+10
+21
+10
+''');
+
+      final feature = result.features.single;
+
+      expect(feature.properties['cad.colorIndex'], '3');
+      expect(feature.properties.containsKey('cad.trueColor'), isFalse);
+      expect(result.diagnostics.parsedEntityCount, 1);
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+
+    test('preserves True Color group 420 as cad.trueColor', () async {
+      final result = await parseEntities('''
+0
+POINT
+8
+COLOR-TRUE
+420
+16711680
+10
+1
+20
+2
+''');
+
+      final feature = result.features.single;
+
+      expect(feature.properties['cad.trueColor'], '16711680');
+      expect(feature.properties.containsKey('cad.colorIndex'), isFalse);
+      expect(result.diagnostics.parsedEntityCount, 1);
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+
+    test('preserves ACI and True Color together without overwriting', () async {
+      final result = await parseEntities(r'''
+0
+TEXT
+8
+COLOR-BOTH
+62
+5
+420
+255
+10
+106
+20
+16
+1
+Điểm màu – ຈຸດສີ – Color point
+''');
+
+      final feature = result.features.single;
+
+      expect(feature.properties['cad.colorIndex'], '5');
+      expect(feature.properties['cad.trueColor'], '255');
+      expect(feature.name, 'Điểm màu – ຈຸດສີ – Color point');
+      expect(result.diagnostics.parsedEntityCount, 1);
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+
+    test('R12 POLYLINE reads color from header metadata', () async {
+      final result = await parseRaw(
+        _r12PolylineDxf(
+          0,
+          [
+            ['0', '0', '0'],
+            ['10', '10', '0'],
+          ],
+          headerColorIndex: '2',
+          headerTrueColor: '65280',
+        ),
+      );
+
+      final feature = result.features.single;
+
+      expect(feature.properties['entityType'], 'POLYLINE');
+      expect(feature.properties['cad.colorIndex'], '2');
+      expect(feature.properties['cad.trueColor'], '65280');
+      expect(result.diagnostics.parsedEntityCount, 1);
+      expect(result.diagnostics.hasIssues, isFalse);
+    });
+  });
+
   group('DXF R12 POLYLINE / VERTEX / SEQEND', () {
     test('parses open and closed POLYLINE as logical entities', () async {
       final open = await parseRaw(
@@ -970,6 +1069,8 @@ String _r12PolylineDxf(
   int flags,
   List<List<String>> vertices, {
   bool includeSeqend = true,
+  String? headerColorIndex,
+  String? headerTrueColor,
 }) {
   final b = StringBuffer();
   for (final line in [
@@ -993,6 +1094,16 @@ String _r12PolylineDxf(
     '$flags',
   ]) {
     b.writeln(line);
+  }
+  if (headerColorIndex != null) {
+    b
+      ..writeln('62')
+      ..writeln(headerColorIndex);
+  }
+  if (headerTrueColor != null) {
+    b
+      ..writeln('420')
+      ..writeln(headerTrueColor);
   }
   for (final v in vertices) {
     for (final line in [

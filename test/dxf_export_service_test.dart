@@ -477,6 +477,111 @@ void main() {
     expect(sourceFeature.properties, {'cadLayer': 'Original'});
   });
 
+  group('DXF R12 entity color export', () {
+    test(
+      'exports cad.colorIndex as entity group 62 and round trips it',
+      () async {
+        final exported = exportFeatures([
+          feature(
+            'point-color',
+            MapFeatureType.point,
+            const [MapCoordinate(x: 1, y: 2)],
+            properties: const {'cad.colorIndex': '3'},
+          ),
+        ]);
+
+        final point = _records(_pairs(exported.content))
+            .singleWhere((record) => record.type == 'POINT');
+        expect(point.value(62), '3');
+
+        final directory = await Directory.systemTemp.createTemp(
+          'geocad-r12-color-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final file = File(
+          '${directory.path}${Platform.pathSeparator}color-roundtrip.dxf',
+        );
+        await file.writeAsBytes(exported.bytes);
+
+        final parsed = await const DxfParserService().parseFile(file.path);
+
+        expect(parsed.features.single.properties['cad.colorIndex'], '3');
+        expect(
+          parsed.features.single.properties.containsKey('cad.trueColor'),
+          isFalse,
+        );
+      },
+    );
+
+    test('does not emit post-R12 group 420 from cad.trueColor', () {
+      final result = exportFeatures([
+        feature(
+          'true-color',
+          MapFeatureType.line,
+          const [MapCoordinate(x: 0, y: 0), MapCoordinate(x: 10, y: 10)],
+          properties: const {'cad.trueColor': '16711680'},
+        ),
+      ]);
+
+      expect(result.content, contains('1\r\nAC1009\r\n'));
+      final line = _records(_pairs(result.content))
+          .singleWhere((record) => record.type == 'LINE');
+      expect(line.value(420), isNull);
+      expect(_pairs(result.content).where((pair) => pair.code == 420), isEmpty);
+    });
+
+    test('POLYLINE writes color only on header not VERTEX or SEQEND', () {
+      final result = exportFeatures([
+        feature(
+          'polyline-color',
+          MapFeatureType.polyline,
+          const [
+            MapCoordinate(x: 0, y: 0),
+            MapCoordinate(x: 5, y: 5),
+            MapCoordinate(x: 10, y: 0),
+          ],
+          properties: const {'cad.colorIndex': '2'},
+        ),
+      ]);
+
+      final records = _records(_pairs(result.content));
+      final polyline = records.singleWhere(
+        (record) => record.type == 'POLYLINE',
+      );
+      final vertices = records
+          .where((record) => record.type == 'VERTEX')
+          .toList();
+      final seqend = records.singleWhere((record) => record.type == 'SEQEND');
+
+      expect(polyline.value(62), '2');
+      expect(vertices, hasLength(3));
+      expect(vertices.every((record) => record.value(62) == null), isTrue);
+      expect(seqend.value(62), isNull);
+    });
+
+    test('keeps ACI export when cad.trueColor is also present', () {
+      final result = exportFeatures([
+        feature(
+          'both-colors',
+          MapFeatureType.text,
+          const [MapCoordinate(x: 10, y: 20)],
+          properties: const {
+            'text': 'Điểm màu – ຈຸດສີ – Color point',
+            'cad.colorIndex': '5',
+            'cad.trueColor': '255',
+          },
+        ),
+      ]);
+
+      final textRecord = _records(_pairs(result.content))
+          .singleWhere((record) => record.type == 'TEXT');
+
+      expect(textRecord.value(62), '5');
+      expect(textRecord.value(420), isNull);
+      expect(textRecord.value(1), 'Điểm màu – ຈຸດສີ – Color point');
+    });
+  });
+
   test('current parser still round trips R12 POINT LINE and TEXT', () async {
     final exported = exportFeatures([
       feature('point', MapFeatureType.point, const [

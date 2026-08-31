@@ -332,6 +332,144 @@ void main() {
     expect(reparsed.diagnostics.parsedGeometryCount, 3);
     expect(reparsed.diagnostics.hasIssues, isFalse);
   });
+  group('KML inline style export and round-trip', () {
+    test('exports LineStyle and reparses canonical stroke style', () {
+      const feature = MapFeature(
+        id: 'styled-line',
+        type: MapFeatureType.polyline,
+        name: 'Tuyến màu',
+        properties: {
+          'style.strokeColor': '#112233',
+          'style.strokeOpacity': '0.5',
+          'style.strokeWidth': '2.5',
+        },
+        coordinates: [
+          MapCoordinate(x: 106, y: 16),
+          MapCoordinate(x: 107, y: 17),
+        ],
+      );
+
+      final document = exportFeature(feature);
+      final lineStyle = document.findAllElements('LineStyle').single;
+
+      expect(lineStyle.findElements('color').single.innerText, '80332211');
+      expect(lineStyle.findElements('width').single.innerText, '2.5');
+
+      final exported = document.toXmlString();
+      final reparsed = const KmlParserService().parseString(exported);
+      final properties = reparsed.features.single.properties;
+
+      expect(properties['style.strokeColor'], '#112233');
+      expect(properties['style.strokeOpacity'], '0.501961');
+      expect(properties['style.strokeWidth'], '2.5');
+    });
+
+    test('exports PolyStyle alpha fill outline and reparses it', () {
+      const feature = MapFeature(
+        id: 'styled-polygon',
+        type: MapFeatureType.polygon,
+        name: 'Vùng màu',
+        properties: {
+          'style.fillColor': '#00FF00',
+          'style.fillOpacity': '0.25',
+          'style.fill': '0',
+          'style.outline': '1',
+        },
+        coordinates: [
+          MapCoordinate(x: 106, y: 16),
+          MapCoordinate(x: 107, y: 16),
+          MapCoordinate(x: 107, y: 17),
+        ],
+      );
+
+      final document = exportFeature(feature);
+      final polyStyle = document.findAllElements('PolyStyle').single;
+
+      expect(polyStyle.findElements('color').single.innerText, '4000ff00');
+      expect(polyStyle.findElements('fill').single.innerText, '0');
+      expect(polyStyle.findElements('outline').single.innerText, '1');
+
+      final reparsed = const KmlParserService().parseString(
+        document.toXmlString(),
+      );
+      final properties = reparsed.features.single.properties;
+
+      expect(properties['style.fillColor'], '#00FF00');
+      expect(properties['style.fillOpacity'], '0.25098');
+      expect(properties['style.fill'], '0');
+      expect(properties['style.outline'], '1');
+    });
+
+    test('preserves styleUrl without resolving shared styles', () {
+      const feature = MapFeature(
+        id: 'style-url',
+        type: MapFeatureType.point,
+        name: 'Điểm styleUrl',
+        properties: {'kml.styleUrl': '#shared-style'},
+        coordinates: [MapCoordinate(x: 106, y: 16)],
+      );
+
+      final document = exportFeature(feature);
+      final placemark = document.findAllElements('Placemark').single;
+
+      expect(
+        placemark.findElements('styleUrl').single.innerText,
+        '#shared-style',
+      );
+
+      final reparsed = const KmlParserService().parseString(
+        document.toXmlString(),
+      );
+      expect(
+        reparsed.features.single.properties['kml.styleUrl'],
+        '#shared-style',
+      );
+    });
+
+    test('does not expose style keys as ExtendedData and preserves Unicode metadata', () {
+      const feature = MapFeature(
+        id: 'style-metadata',
+        type: MapFeatureType.polyline,
+        name: 'Việt Nam – ລາວ – English',
+        properties: {
+          'owner': 'Đội khảo sát – ທີມສຳຫຼວດ – Survey Team',
+          'style.strokeColor': '#FF0000',
+          'style.strokeOpacity': '1',
+          'style.strokeWidth': '3',
+          'kml.styleUrl': '#line-style',
+        },
+        coordinates: [
+          MapCoordinate(x: 106, y: 16),
+          MapCoordinate(x: 107, y: 17),
+        ],
+      );
+
+      final document = exportFeature(feature);
+      final placemark = document.findAllElements('Placemark').single;
+      final dataNames = placemark
+          .findAllElements('Data')
+          .map((element) => element.getAttribute('name'))
+          .toList();
+
+      expect(dataNames, ['owner']);
+      expect(
+        placemark.findAllElements('value').single.innerText,
+        'Đội khảo sát – ທີມສຳຫຼວດ – Survey Team',
+      );
+
+      final reparsed = const KmlParserService().parseString(
+        document.toXmlString(),
+      );
+      final properties = reparsed.features.single.properties;
+
+      expect(properties['owner'], 'Đội khảo sát – ທີມສຳຫຼວດ – Survey Team');
+      expect(properties['style.strokeColor'], '#FF0000');
+      expect(properties['style.strokeOpacity'], '1');
+      expect(properties['style.strokeWidth'], '3');
+      expect(properties['kml.styleUrl'], '#line-style');
+    });
+  });
+
   test('rejects layers that are not WGS84', () {
     const localLayer = MapLayer(
       id: 'local-layer',

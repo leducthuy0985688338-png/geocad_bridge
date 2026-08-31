@@ -819,7 +819,11 @@ class DxfParserService {
           : 'POLYLINE ${featureIndex + 1}',
       coordinates: coordinates,
       properties: {
-        ..._createProperties(entityType: 'POLYLINE', layerName: layerName),
+        ..._createProperties(
+          entityType: 'POLYLINE',
+          data: headerData,
+          layerName: layerName,
+        ),
         'closed': isClosed.toString(),
         'vertexCount': coordinates.length.toString(),
       },
@@ -908,7 +912,11 @@ class DxfParserService {
       type: MapFeatureType.point,
       name: 'POINT ${featureIndex + 1}',
       coordinates: [MapCoordinate(x: x, y: y, z: z)],
-      properties: _createProperties(entityType: 'POINT', layerName: layerName),
+      properties: _createProperties(
+        entityType: 'POINT',
+        data: data,
+        layerName: layerName,
+      ),
     );
   }
 
@@ -936,7 +944,11 @@ class DxfParserService {
         MapCoordinate(x: startX, y: startY, z: startZ),
         MapCoordinate(x: endX, y: endY, z: endZ),
       ],
-      properties: _createProperties(entityType: 'LINE', layerName: layerName),
+      properties: _createProperties(
+        entityType: 'LINE',
+        data: data,
+        layerName: layerName,
+      ),
     );
   }
 
@@ -980,7 +992,11 @@ class DxfParserService {
           : 'LWPOLYLINE ${featureIndex + 1}',
       coordinates: coordinates,
       properties: {
-        ..._createProperties(entityType: 'LWPOLYLINE', layerName: layerName),
+        ..._createProperties(
+          entityType: 'LWPOLYLINE',
+          data: data,
+          layerName: layerName,
+        ),
         'closed': isClosed.toString(),
         'vertexCount': coordinates.length.toString(),
       },
@@ -989,6 +1005,7 @@ class DxfParserService {
 
   Map<String, String> _createProperties({
     required String entityType,
+    required List<DxfGroupPair> data,
     String? layerName,
   }) {
     final properties = <String, String>{
@@ -998,6 +1015,16 @@ class DxfParserService {
 
     if (layerName != null && layerName.isNotEmpty) {
       properties['cadLayer'] = layerName;
+    }
+
+    final colorIndex = _readString(data, 62);
+    if (colorIndex != null && colorIndex.isNotEmpty) {
+      properties['cad.colorIndex'] = colorIndex;
+    }
+
+    final trueColor = _readString(data, 420);
+    if (trueColor != null && trueColor.isNotEmpty) {
+      properties['cad.trueColor'] = trueColor;
     }
 
     return properties;
@@ -1032,6 +1059,7 @@ class DxfParserService {
       properties: {
         ..._createProperties(
           entityType: 'CIRCLE',
+          data: data,
           layerName: _readString(data, 8),
         ),
         'closed': 'true',
@@ -1086,6 +1114,7 @@ class DxfParserService {
       properties: {
         ..._createProperties(
           entityType: 'ARC',
+          data: data,
           layerName: _readString(data, 8),
         ),
         'centerX': centerX.toString(),
@@ -1172,6 +1201,7 @@ class DxfParserService {
       properties: {
         ..._createProperties(
           entityType: entityType,
+          data: data,
           layerName: _readString(data, 8),
         ),
         'text': normalizedContent,
