@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:xml/xml.dart';
@@ -8,6 +8,12 @@ import '../models/map_layer.dart';
 
 class KmlExportService {
   const KmlExportService();
+
+  static const _internalKmlPropertyKeys = {
+    'kmlGeometry',
+    'kmlFromMultiGeometry',
+    'kmlAltitudeMode',
+  };
 
   String exportLayers({
     required String documentName,
@@ -114,11 +120,15 @@ class KmlExportService {
           builder.element('description', nest: description);
         }
 
-        if (feature.properties.isNotEmpty) {
+        final exportProperties = feature.properties.entries
+            .where((entry) => !_internalKmlPropertyKeys.contains(entry.key))
+            .toList();
+
+        if (exportProperties.isNotEmpty) {
           builder.element(
             'ExtendedData',
             nest: () {
-              for (final entry in feature.properties.entries) {
+              for (final entry in exportProperties) {
                 builder.element(
                   'Data',
                   attributes: {'name': entry.key},
@@ -134,7 +144,7 @@ class KmlExportService {
         switch (feature.type) {
           case MapFeatureType.point:
           case MapFeatureType.text:
-            _writePoint(builder, feature.coordinates.first);
+            _writePoint(builder, feature);
             return;
 
           case MapFeatureType.line:
@@ -145,7 +155,7 @@ class KmlExportService {
                 'phải có ít nhất 2 tọa độ.',
               );
             }
-            _writeLineString(builder, feature.coordinates);
+            _writeLineString(builder, feature);
             return;
 
           case MapFeatureType.polygon:
@@ -155,29 +165,33 @@ class KmlExportService {
                 'phải có ít nhất 3 tọa độ.',
               );
             }
-            _writePolygon(builder, feature.coordinates);
+            _writePolygon(builder, feature);
             return;
         }
       },
     );
   }
 
-  void _writePoint(XmlBuilder builder, MapCoordinate coordinate) {
+  void _writePoint(XmlBuilder builder, MapFeature feature) {
+    final coordinate = feature.coordinates.first;
+
     builder.element(
       'Point',
       nest: () {
-        _writeAltitudeMode(builder, [coordinate]);
+        _writeAltitudeMode(builder, feature);
         builder.element('coordinates', nest: _coordinateTuple(coordinate));
       },
     );
   }
 
-  void _writeLineString(XmlBuilder builder, List<MapCoordinate> coordinates) {
+  void _writeLineString(XmlBuilder builder, MapFeature feature) {
+    final coordinates = feature.coordinates;
+
     builder.element(
       'LineString',
       nest: () {
         builder.element('tessellate', nest: '1');
-        _writeAltitudeMode(builder, coordinates);
+        _writeAltitudeMode(builder, feature);
         builder.element(
           'coordinates',
           nest: coordinates.map(_coordinateTuple).join(' '),
@@ -186,8 +200,8 @@ class KmlExportService {
     );
   }
 
-  void _writePolygon(XmlBuilder builder, List<MapCoordinate> coordinates) {
-    final ring = List<MapCoordinate>.from(coordinates);
+  void _writePolygon(XmlBuilder builder, MapFeature feature) {
+    final ring = List<MapCoordinate>.from(feature.coordinates);
     final first = ring.first;
     final last = ring.last;
 
@@ -198,7 +212,7 @@ class KmlExportService {
     builder.element(
       'Polygon',
       nest: () {
-        _writeAltitudeMode(builder, ring);
+        _writeAltitudeMode(builder, feature);
         builder.element(
           'outerBoundaryIs',
           nest: () {
@@ -217,13 +231,16 @@ class KmlExportService {
     );
   }
 
-  void _writeAltitudeMode(XmlBuilder builder, List<MapCoordinate> coordinates) {
-    final hasAltitude = coordinates.any((coordinate) => coordinate.z != null);
+  void _writeAltitudeMode(XmlBuilder builder, MapFeature feature) {
+    final preservedMode = feature.properties['kmlAltitudeMode']?.trim();
 
-    builder.element(
-      'altitudeMode',
-      nest: hasAltitude ? 'absolute' : 'clampToGround',
-    );
+    final altitudeMode = preservedMode != null && preservedMode.isNotEmpty
+        ? preservedMode
+        : feature.coordinates.any((coordinate) => coordinate.z != null)
+        ? 'absolute'
+        : 'clampToGround';
+
+    builder.element('altitudeMode', nest: altitudeMode);
   }
 
   String _coordinateTuple(MapCoordinate coordinate) {
