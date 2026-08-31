@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -5,30 +6,104 @@ import 'package:xml/xml.dart';
 
 import '../models/map_feature.dart';
 
+enum KmlDiagnosticSeverity { warning, error }
+
+enum KmlDiagnosticCode {
+  unsupportedGeometry,
+  malformedGeometry,
+  fidelityWarning,
+}
+
+class KmlImportDiagnostic {
+  final KmlDiagnosticSeverity severity;
+  final KmlDiagnosticCode code;
+  final int placemarkIndex;
+  final String placemarkName;
+  final String geometryType;
+  final String message;
+
+  const KmlImportDiagnostic({
+    required this.severity,
+    required this.code,
+    required this.placemarkIndex,
+    required this.placemarkName,
+    required this.geometryType,
+    required this.message,
+  });
+}
+
+class KmlImportDiagnostics {
+  final int totalGeometryCount;
+  final int parsedGeometryCount;
+  final int malformedGeometryCount;
+  final Map<String, int> unsupportedGeometryCounts;
+  final List<KmlImportDiagnostic> issues;
+
+  KmlImportDiagnostics({
+    required this.totalGeometryCount,
+    required this.parsedGeometryCount,
+    required this.malformedGeometryCount,
+    required Map<String, int> unsupportedGeometryCounts,
+    required List<KmlImportDiagnostic> issues,
+  }) : unsupportedGeometryCounts = UnmodifiableMapView(
+         Map<String, int>.fromEntries(
+           unsupportedGeometryCounts.entries.toList()
+             ..sort((a, b) => a.key.compareTo(b.key)),
+         ),
+       ),
+       issues = List.unmodifiable(issues);
+
+  int get unsupportedGeometryCount =>
+      unsupportedGeometryCounts.values.fold(0, (sum, count) => sum + count);
+
+  int get skippedGeometryCount =>
+      malformedGeometryCount + unsupportedGeometryCount;
+
+  bool get hasIssues => issues.isNotEmpty;
+
+  bool get hasFidelityWarnings =>
+      issues.any((issue) => issue.code == KmlDiagnosticCode.fidelityWarning);
+}
+
 class KmlParseResult {
   final List<MapFeature> features;
   final int placemarkCount;
   final int pointCount;
   final int lineStringCount;
   final int polygonCount;
+  final KmlImportDiagnostics diagnostics;
 
-  const KmlParseResult({
-    required this.features,
+  KmlParseResult({
+    required List<MapFeature> features,
     required this.placemarkCount,
     required this.pointCount,
     required this.lineStringCount,
     required this.polygonCount,
-  });
+    required this.diagnostics,
+  }) : features = List.unmodifiable(features);
 }
 
 class KmlParserService {
   const KmlParserService();
 
+  static const _supportedGeometryTypes = {'Point', 'LineString', 'Polygon'};
+  static const _knownUnsupportedGeometryTypes = {
+    'Model',
+    'LinearRing',
+    'Track',
+    'MultiTrack',
+  };
+  static const _standardAltitudeModes = {
+    'clampToGround',
+    'relativeToGround',
+    'absolute',
+  };
+
   Future<KmlParseResult> parseFile(String path) async {
     final file = File(path);
 
     if (!await file.exists()) {
-      throw ArgumentError('Không tìm thấy file KML: $path');
+      throw ArgumentError('KhÃ´ng tÃ¬m tháº¥y file KML: $path');
     }
 
     final content = await file.readAsString(encoding: utf8);
@@ -41,14 +116,18 @@ class KmlParserService {
     try {
       document = XmlDocument.parse(content);
     } on XmlParserException catch (error) {
-      throw FormatException('KML không hợp lệ: ${error.message}');
+      throw FormatException('KML khÃ´ng há»£p lá»‡: ${error.message}');
     }
 
     final features = <MapFeature>[];
+    final issues = <KmlImportDiagnostic>[];
+    final unsupportedGeometryCounts = <String, int>{};
     var placemarkCount = 0;
     var pointCount = 0;
     var lineStringCount = 0;
     var polygonCount = 0;
+    var totalGeometryCount = 0;
+    var malformedGeometryCount = 0;
     var featureIndex = 0;
 
     final placemarks = document.descendants.whereType<XmlElement>().where(
@@ -60,125 +139,204 @@ class KmlParserService {
 
       final name = _firstChildText(placemark, 'name') ?? '';
       final description = _firstChildText(placemark, 'description');
-      final properties = _readExtendedData(placemark);
+      final baseProperties = _readExtendedData(placemark);
+      final geometryEntries = _geometryEntries(placemark);
 
-      final geometries = placemark.descendants.whereType<XmlElement>().where((
-        element,
-      ) {
-        final name = element.name.local;
-        return name == 'Point' || name == 'LineString' || name == 'Polygon';
-      });
-
-      for (final geometry in geometries) {
+      for (final entry in geometryEntries) {
+        final geometry = entry.element;
         final localName = geometry.name.local;
+        totalGeometryCount++;
 
-        if (localName == 'Point') {
-          final coordinates = _coordinatesFromGeometry(
-            geometry,
-            placemarkName: name,
-            geometryType: localName,
+        if (!_supportedGeometryTypes.contains(localName)) {
+          unsupportedGeometryCounts.update(
+            localName,
+            (count) => count + 1,
+            ifAbsent: () => 1,
           );
-
-          if (coordinates.length != 1) {
-            throw _geometryError(name, localName, 'phải có đúng 1 bộ tọa độ');
-          }
-
-          featureIndex++;
-          pointCount++;
-
-          features.add(
-            MapFeature(
-              id: 'kml-feature-$featureIndex',
-              type: MapFeatureType.point,
-              coordinates: [coordinates.first],
-              name: name,
-              description: description,
-              properties: {...properties, 'kmlGeometry': 'Point'},
+          issues.add(
+            KmlImportDiagnostic(
+              severity: KmlDiagnosticSeverity.warning,
+              code: KmlDiagnosticCode.unsupportedGeometry,
+              placemarkIndex: placemarkCount,
+              placemarkName: name,
+              geometryType: localName,
+              message: 'Geometry $localName chÆ°a Ä‘Æ°á»£c GeoCAD há»— trá»£.',
             ),
           );
-        } else if (localName == 'LineString') {
-          final coordinates = _coordinatesFromGeometry(
-            geometry,
-            placemarkName: name,
-            geometryType: localName,
+          continue;
+        }
+
+        if (localName == 'Polygon' &&
+            _hasDirectChild(geometry, 'innerBoundaryIs')) {
+          unsupportedGeometryCounts.update(
+            localName,
+            (count) => count + 1,
+            ifAbsent: () => 1,
           );
-
-          if (coordinates.length < 2) {
-            throw _geometryError(
-              name,
-              localName,
-              'phải có ít nhất 2 bộ tọa độ',
-            );
-          }
-
-          featureIndex++;
-          lineStringCount++;
-
-          features.add(
-            MapFeature(
-              id: 'kml-feature-$featureIndex',
-              type: MapFeatureType.polyline,
-              coordinates: coordinates,
-              name: name,
-              description: description,
-              properties: {...properties, 'kmlGeometry': 'LineString'},
+          issues.add(
+            KmlImportDiagnostic(
+              severity: KmlDiagnosticSeverity.warning,
+              code: KmlDiagnosticCode.fidelityWarning,
+              placemarkIndex: placemarkCount,
+              placemarkName: name,
+              geometryType: localName,
+              message: 'Polygon cÃ³ innerBoundaryIs (polygon cÃ³ lá»—) chÆ°a Ä‘Æ°á»£c model GeoCAD há»— trá»£; geometry Ä‘Ã£ bá»‹ bá» qua Ä‘á»ƒ trÃ¡nh máº¥t fidelity.',
             ),
           );
-        } else if (localName == 'Polygon') {
-          final hasInnerBoundary = geometry.descendants
-              .whereType<XmlElement>()
-              .any((element) => element.name.local == 'innerBoundaryIs');
+          continue;
+        }
 
-          if (hasInnerBoundary) {
-            throw _geometryError(
-              name,
-              localName,
-              'chưa hỗ trợ innerBoundaryIs (polygon có lỗ)',
+        try {
+          final geometryProperties = <String, String>{...baseProperties};
+          geometryProperties['kmlGeometry'] = localName;
+          if (entry.fromMultiGeometry) {
+            geometryProperties['kmlFromMultiGeometry'] = 'true';
+          }
+          if (localName == 'Point') {
+            final coordinates = _coordinatesFromGeometry(
+              geometry,
+              placemarkName: name,
+              geometryType: localName,
+            );
+
+            if (coordinates.length != 1) {
+              throw _geometryError(
+                name,
+                localName,
+                'pháº£i cÃ³ Ä‘Ãºng 1 bá»™ tá»a Ä‘á»™',
+              );
+            }
+
+            _preserveAltitudeMode(
+              geometry,
+              properties: geometryProperties,
+              placemarkIndex: placemarkCount,
+              placemarkName: name,
+              geometryType: localName,
+              issues: issues,
+            );
+
+            featureIndex++;
+            pointCount++;
+            features.add(
+              MapFeature(
+                id: 'kml-feature-$featureIndex',
+                type: MapFeatureType.point,
+                coordinates: [coordinates.first],
+                name: name,
+                description: description,
+                properties: geometryProperties,
+              ),
+            );
+          } else if (localName == 'LineString') {
+            final coordinates = _coordinatesFromGeometry(
+              geometry,
+              placemarkName: name,
+              geometryType: localName,
+            );
+
+            if (coordinates.length < 2) {
+              throw _geometryError(
+                name,
+                localName,
+                'pháº£i cÃ³ Ã­t nháº¥t 2 bá»™ tá»a Ä‘á»™',
+              );
+            }
+
+            _preserveAltitudeMode(
+              geometry,
+              properties: geometryProperties,
+              placemarkIndex: placemarkCount,
+              placemarkName: name,
+              geometryType: localName,
+              issues: issues,
+            );
+
+            featureIndex++;
+            lineStringCount++;
+            features.add(
+              MapFeature(
+                id: 'kml-feature-$featureIndex',
+                type: MapFeatureType.polyline,
+                coordinates: coordinates,
+                name: name,
+                description: description,
+                properties: geometryProperties,
+              ),
+            );
+          } else if (localName == 'Polygon') {
+            final outerBoundary = _firstDirectChild(
+              geometry,
+              'outerBoundaryIs',
+            );
+            if (outerBoundary == null) {
+              throw _geometryError(name, localName, 'thiáº¿u outerBoundaryIs');
+            }
+
+            final linearRing = _firstDirectChild(outerBoundary, 'LinearRing');
+            if (linearRing == null) {
+              throw _geometryError(name, localName, 'thiáº¿u LinearRing');
+            }
+
+            final coordinates = _coordinatesFromGeometry(
+              linearRing,
+              placemarkName: name,
+              geometryType: localName,
+            );
+            _validateOuterRing(coordinates, name, localName);
+
+            _preserveAltitudeMode(
+              geometry,
+              properties: geometryProperties,
+              placemarkIndex: placemarkCount,
+              placemarkName: name,
+              geometryType: localName,
+              issues: issues,
+            );
+
+            featureIndex++;
+            polygonCount++;
+            features.add(
+              MapFeature(
+                id: 'kml-feature-$featureIndex',
+                type: MapFeatureType.polygon,
+                coordinates: coordinates,
+                name: name,
+                description: description,
+                properties: geometryProperties,
+              ),
             );
           }
-
-          final outerBoundary = _firstDescendant(geometry, 'outerBoundaryIs');
-
-          if (outerBoundary == null) {
-            throw _geometryError(name, localName, 'thiếu outerBoundaryIs');
-          }
-
-          final linearRing = _firstDescendant(outerBoundary, 'LinearRing');
-
-          if (linearRing == null) {
-            throw _geometryError(name, localName, 'thiếu LinearRing');
-          }
-
-          final coordinates = _coordinatesFromGeometry(
-            linearRing,
-            placemarkName: name,
-            geometryType: localName,
-          );
-
-          if (coordinates.length < 3) {
-            throw _geometryError(
-              name,
-              localName,
-              'phải có ít nhất 3 bộ tọa độ',
-            );
-          }
-
-          featureIndex++;
-          polygonCount++;
-
-          features.add(
-            MapFeature(
-              id: 'kml-feature-$featureIndex',
-              type: MapFeatureType.polygon,
-              coordinates: coordinates,
-              name: name,
-              description: description,
-              properties: {...properties, 'kmlGeometry': 'Polygon'},
+        } on FormatException catch (error) {
+          malformedGeometryCount++;
+          issues.add(
+            KmlImportDiagnostic(
+              severity: KmlDiagnosticSeverity.error,
+              code: KmlDiagnosticCode.malformedGeometry,
+              placemarkIndex: placemarkCount,
+              placemarkName: name,
+              geometryType: localName,
+              message: error.message,
             ),
           );
         }
       }
     }
+
+    final diagnostics = KmlImportDiagnostics(
+      totalGeometryCount: totalGeometryCount,
+      parsedGeometryCount: features.length,
+      malformedGeometryCount: malformedGeometryCount,
+      unsupportedGeometryCounts: unsupportedGeometryCounts,
+      issues: issues,
+    );
+
+    assert(
+      diagnostics.totalGeometryCount ==
+          diagnostics.parsedGeometryCount +
+              diagnostics.malformedGeometryCount +
+              diagnostics.unsupportedGeometryCount,
+    );
 
     return KmlParseResult(
       features: features,
@@ -186,7 +344,98 @@ class KmlParserService {
       pointCount: pointCount,
       lineStringCount: lineStringCount,
       polygonCount: polygonCount,
+      diagnostics: diagnostics,
     );
+  }
+
+  List<_KmlGeometryEntry> _geometryEntries(XmlElement placemark) {
+    final result = <_KmlGeometryEntry>[];
+
+    void collect(XmlElement parent, {required bool insideMultiGeometry}) {
+      for (final child in parent.children.whereType<XmlElement>()) {
+        final localName = child.name.local;
+        if (localName == 'MultiGeometry') {
+          collect(child, insideMultiGeometry: true);
+        } else if (_supportedGeometryTypes.contains(localName) ||
+            _knownUnsupportedGeometryTypes.contains(localName)) {
+          result.add(
+            _KmlGeometryEntry(
+              element: child,
+              fromMultiGeometry: insideMultiGeometry,
+            ),
+          );
+        }
+      }
+    }
+
+    collect(placemark, insideMultiGeometry: false);
+    return result;
+  }
+
+  void _preserveAltitudeMode(
+    XmlElement geometry, {
+    required Map<String, String> properties,
+    required int placemarkIndex,
+    required String placemarkName,
+    required String geometryType,
+    required List<KmlImportDiagnostic> issues,
+  }) {
+    final altitudeModeElement = _firstDirectChild(geometry, 'altitudeMode');
+    if (altitudeModeElement == null) return;
+
+    final altitudeMode = altitudeModeElement.innerText.trim();
+    if (altitudeMode.isEmpty) return;
+
+    properties['kmlAltitudeMode'] = altitudeMode;
+    if (!_standardAltitudeModes.contains(altitudeMode)) {
+      issues.add(
+        KmlImportDiagnostic(
+          severity: KmlDiagnosticSeverity.warning,
+          code: KmlDiagnosticCode.fidelityWarning,
+          placemarkIndex: placemarkIndex,
+          placemarkName: placemarkName,
+          geometryType: geometryType,
+          message:
+              'altitudeMode "$altitudeMode" Ä‘Æ°á»£c giá»¯ nguyÃªn nhÆ°ng semantics chÆ°a Ä‘Æ°á»£c GeoCAD xÃ¡c nháº­n há»— trá»£.',
+        ),
+      );
+    }
+  }
+
+  void _validateOuterRing(
+    List<MapCoordinate> coordinates,
+    String placemarkName,
+    String geometryType,
+  ) {
+    if (coordinates.length < 4) {
+      throw _geometryError(
+        placemarkName,
+        geometryType,
+        'outer LinearRing pháº£i cÃ³ Ã­t nháº¥t 4 bá»™ tá»a Ä‘á»™',
+      );
+    }
+
+    final first = coordinates.first;
+    final last = coordinates.last;
+    if (first.x != last.x || first.y != last.y || first.z != last.z) {
+      throw _geometryError(
+        placemarkName,
+        geometryType,
+        'outer LinearRing pháº£i khÃ©p kÃ­n (tá»a Ä‘á»™ Ä‘áº§u vÃ  cuá»‘i pháº£i trÃ¹ng nhau)',
+      );
+    }
+
+    final uniqueVertices = coordinates
+        .take(coordinates.length - 1)
+        .map((coordinate) => '${coordinate.x},${coordinate.y},${coordinate.z}')
+        .toSet();
+    if (uniqueVertices.length < 3) {
+      throw _geometryError(
+        placemarkName,
+        geometryType,
+        'outer LinearRing pháº£i cÃ³ Ã­t nháº¥t 3 Ä‘á»‰nh phÃ¢n biá»‡t',
+      );
+    }
   }
 
   List<MapCoordinate> _coordinatesFromGeometry(
@@ -194,10 +443,10 @@ class KmlParserService {
     required String placemarkName,
     required String geometryType,
   }) {
-    final element = _firstDescendant(geometry, 'coordinates');
+    final element = _firstDirectChild(geometry, 'coordinates');
 
     if (element == null) {
-      throw _geometryError(placemarkName, geometryType, 'thiếu coordinates');
+      throw _geometryError(placemarkName, geometryType, 'thiáº¿u coordinates');
     }
 
     return _parseCoordinates(
@@ -213,9 +462,10 @@ class KmlParserService {
     required String geometryType,
   }) {
     final result = <MapCoordinate>[];
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return result;
 
-    final tuples = raw
-        .trim()
+    final tuples = trimmed
         .split(RegExp(r'\s+'))
         .where((item) => item.trim().isNotEmpty);
 
@@ -230,7 +480,7 @@ class KmlParserService {
           geometryType,
           tupleIndex,
           tuple,
-          'phải có dạng longitude,latitude[,altitude]',
+          'pháº£i cÃ³ dáº¡ng longitude,latitude[,altitude]',
         );
       }
 
@@ -246,7 +496,7 @@ class KmlParserService {
           geometryType,
           tupleIndex,
           tuple,
-          'longitude/latitude phải là số hữu hạn',
+          'longitude/latitude pháº£i lÃ  sá»‘ há»¯u háº¡n',
         );
       }
 
@@ -256,7 +506,7 @@ class KmlParserService {
           geometryType,
           tupleIndex,
           tuple,
-          'longitude phải nằm trong [-180, 180]',
+          'longitude pháº£i náº±m trong [-180, 180]',
         );
       }
 
@@ -266,13 +516,12 @@ class KmlParserService {
           geometryType,
           tupleIndex,
           tuple,
-          'latitude phải nằm trong [-90, 90]',
+          'latitude pháº£i náº±m trong [-90, 90]',
         );
       }
 
       double? altitude;
-
-      if (parts.length >= 3 && parts[2].trim().isNotEmpty) {
+      if (parts.length == 3 && parts[2].trim().isNotEmpty) {
         altitude = double.tryParse(parts[2].trim());
         if (altitude == null || !altitude.isFinite) {
           throw _coordinateError(
@@ -280,7 +529,7 @@ class KmlParserService {
             geometryType,
             tupleIndex,
             tuple,
-            'altitude phải là số hữu hạn',
+            'altitude pháº£i lÃ  sá»‘ há»¯u háº¡n',
           );
         }
       }
@@ -296,7 +545,7 @@ class KmlParserService {
     String geometryType,
     String message,
   ) {
-    final displayName = placemarkName.isEmpty ? '(không tên)' : placemarkName;
+    final displayName = placemarkName.isEmpty ? '(khÃ´ng tÃªn)' : placemarkName;
     return FormatException(
       'Placemark "$displayName", $geometryType: $message.',
     );
@@ -312,7 +561,7 @@ class KmlParserService {
     return _geometryError(
       placemarkName,
       geometryType,
-      'tọa độ #$tupleIndex "$tuple" không hợp lệ: $message',
+      'tá»a Ä‘á»™ #$tupleIndex "$tuple" khÃ´ng há»£p lá»‡: $message',
     );
   }
 
@@ -323,11 +572,9 @@ class KmlParserService {
       (element) => element.name.local == 'Data',
     )) {
       final key = data.getAttribute('name');
-
       if (key == null || key.isEmpty) continue;
 
       final valueElement = _firstDescendant(data, 'value');
-
       if (valueElement != null) {
         result[key] = valueElement.innerText.trim();
       }
@@ -338,33 +585,44 @@ class KmlParserService {
           (element) => element.name.local == 'SimpleData',
         )) {
       final key = simpleData.getAttribute('name');
-
       if (key == null || key.isEmpty) continue;
-
       result[key] = simpleData.innerText.trim();
     }
 
     return result;
   }
 
-  String? _firstChildText(XmlElement parent, String localName) {
-    for (final child in parent.children.whereType<XmlElement>()) {
-      if (child.name.local == localName) {
-        final value = child.innerText.trim();
-        return value.isEmpty ? null : value;
-      }
-    }
+  bool _hasDirectChild(XmlElement parent, String localName) =>
+      _firstDirectChild(parent, localName) != null;
 
+  XmlElement? _firstDirectChild(XmlElement parent, String localName) {
+    for (final child in parent.children.whereType<XmlElement>()) {
+      if (child.name.local == localName) return child;
+    }
     return null;
+  }
+
+  String? _firstChildText(XmlElement parent, String localName) {
+    final child = _firstDirectChild(parent, localName);
+    if (child == null) return null;
+    final value = child.innerText.trim();
+    return value.isEmpty ? null : value;
   }
 
   XmlElement? _firstDescendant(XmlElement parent, String localName) {
     for (final element in parent.descendants.whereType<XmlElement>()) {
-      if (element.name.local == localName) {
-        return element;
-      }
+      if (element.name.local == localName) return element;
     }
-
     return null;
   }
+}
+
+class _KmlGeometryEntry {
+  final XmlElement element;
+  final bool fromMultiGeometry;
+
+  const _KmlGeometryEntry({
+    required this.element,
+    required this.fromMultiGeometry,
+  });
 }
