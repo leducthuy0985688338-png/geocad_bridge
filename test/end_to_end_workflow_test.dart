@@ -507,4 +507,152 @@ EOF
     expect(projectTitle(tester), endsWith(' *'));
     expect(find.byTooltip('Ẩn layer'), findsOneWidget);
   });
+
+  test('feature metadata survives DXF georeference reprojection persistence and KML round-trip', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'geocad-metadata-e2e-',
+    );
+    addTearDown(() async {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
+
+    final dxfPath = '${directory.path}${Platform.pathSeparator}metadata.dxf';
+
+    await File(dxfPath).writeAsString(r'''0
+SECTION
+2
+ENTITIES
+0
+TEXT
+8
+ANNOTATION
+10
+0
+20
+0
+30
+25
+40
+2.5
+1
+Điểm metadata
+50
+30
+7
+STANDARD
+0
+ENDSEC
+0
+EOF
+''');
+
+    final parsedDxf = await const DxfParserService().parseFile(dxfPath);
+
+    expect(parsedDxf.features, hasLength(1));
+
+    final importedFeature = parsedDxf.features.single;
+
+    expect(importedFeature.properties['cadLayer'], 'ANNOTATION');
+    expect(importedFeature.properties['textHeight'], '2.5');
+    expect(importedFeature.properties['rotationDegrees'], '30.0');
+    expect(importedFeature.properties['textStyle'], 'STANDARD');
+
+    final localLayer = MapLayer(
+      id: 'metadata-local',
+      name: 'Metadata CAD',
+      sourceType: MapLayerSourceType.dxf,
+      sourcePath: dxfPath,
+      features: [
+        importedFeature.setProperties(const {
+          'surveyCode': 'P01',
+          'owner': 'Đội khảo sát – ທີມສຳຫຼວດ – Survey Team',
+        }),
+      ],
+      properties: const {'source': 'metadata-e2e'},
+    );
+
+    final georeferenced = const LayerGeoreferenceService().georeferenceLayer(
+      sourceLayer: localLayer,
+      point1: const GeoreferenceControlPoint(
+        local: MapCoordinate(x: 0, y: 0),
+        target: MapCoordinate(x: 500000, y: 1800000),
+      ),
+      point2: const GeoreferenceControlPoint(
+        local: MapCoordinate(x: 100, y: 0),
+        target: MapCoordinate(x: 500100, y: 1800000),
+      ),
+      targetCrs: utm48North,
+    );
+
+    final wgs84 = const LayerReprojectionService().reprojectLayer(
+      sourceLayer: georeferenced.layer,
+      targetCrs: const CoordinateReferenceSystem.wgs84(),
+    );
+
+    final beforePersistence = wgs84.layer.features.single;
+
+    expect(beforePersistence.properties['cadLayer'], 'ANNOTATION');
+    expect(beforePersistence.properties['textHeight'], '2.5');
+    expect(beforePersistence.properties['rotationDegrees'], '30.0');
+    expect(beforePersistence.properties['textStyle'], 'STANDARD');
+    expect(beforePersistence.properties['surveyCode'], 'P01');
+    expect(
+      beforePersistence.properties['owner'],
+      'Đội khảo sát – ທີມສຳຫຼວດ – Survey Team',
+    );
+
+    final project = MapProject(
+      id: 'metadata-project',
+      name: 'Metadata project',
+      layers: [wgs84.layer],
+    );
+
+    final timestamp = DateTime.utc(2026, 8, 31);
+
+    final document = GeoCadProjectDocument(
+      project: project,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    );
+
+    const persistence = ProjectPersistenceService();
+
+    final restored = persistence.deserialize(persistence.serialize(document));
+
+    final restoredLayer = restored.project.layers.single;
+    final restoredFeature = restoredLayer.features.single;
+
+    expect(restoredFeature.properties, beforePersistence.properties);
+
+    final kml = const KmlExportService().exportLayers(
+      documentName: 'Metadata round-trip',
+      layers: [restoredLayer],
+    );
+
+    final reparsedKml = const KmlParserService().parseString(kml);
+
+    expect(reparsedKml.features, hasLength(1));
+
+    final finalFeature = reparsedKml.features.single;
+
+    expect(finalFeature.properties['cadLayer'], 'ANNOTATION');
+    expect(finalFeature.properties['textHeight'], '2.5');
+    expect(finalFeature.properties['rotationDegrees'], '30.0');
+    expect(finalFeature.properties['textStyle'], 'STANDARD');
+    expect(finalFeature.properties['surveyCode'], 'P01');
+    expect(
+      finalFeature.properties['owner'],
+      'Đội khảo sát – ທີມສຳຫຼວດ – Survey Team',
+    );
+
+    // KML parser adds its own internal geometry metadata after import.
+    // These keys must not be confused with user ExtendedData.
+    expect(finalFeature.properties['kmlGeometry'], 'Point');
+    expect(finalFeature.properties['kmlAltitudeMode'], 'absolute');
+    expect(finalFeature.properties, isNot(contains('kmlFromMultiGeometry')));
+
+    expect(reparsedKml.diagnostics.hasIssues, isFalse);
+  });
 }
