@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:autocad_googleearth/l10n/generated/app_localizations.dart';
 import 'package:autocad_googleearth/models/cad_document.dart';
 import 'package:autocad_googleearth/models/coordinate_reference_system.dart';
 import 'package:autocad_googleearth/models/map_feature.dart';
@@ -34,6 +35,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: HomeScreen(
           initialProject: const MapProject(id: 'import', name: 'Import test'),
           cadDocumentsSelectorOverride: () async => [

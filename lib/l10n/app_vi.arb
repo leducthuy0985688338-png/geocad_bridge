@@ -1,9 +1,65 @@
-﻿{
-  "@@locale": "vi",
-  "appTitle": "GeoCAD Bridge",
-  "language": "Ngôn ngữ",
-  "selectLanguage": "Chọn ngôn ngữ",
-  "vietnamese": "Tiếng Việt",
-  "lao": "ລາວ",
-  "english": "English"
+{
+    "@@locale":  "vi",
+    "appTitle":  "AutoCAD ↔ Google Earth",
+    "language":  "Ngôn ngữ",
+    "selectLanguage":  "Chọn ngôn ngữ",
+    "vietnamese":  "Tiếng Việt",
+    "lao":  "ລາວ",
+    "english":  "English",
+    "projectNew":  "Project mới",
+    "projectOpen":  "Mở project",
+    "projectSave":  "Lưu project",
+    "projectSaveAs":  "Lưu project thành...",
+    "tools":  "CÔNG CỤ",
+    "importingCad":  "Đang đọc bản vẽ...",
+    "addAutoCadDrawing":  "Thêm bản vẽ AutoCAD",
+    "selectMultipleDwgDxf":  "Chọn nhiều DWG / DXF",
+    "importingGoogleEarth":  "Đang đọc dữ liệu...",
+    "addGoogleEarthData":  "Thêm dữ liệu Google Earth",
+    "kmlWgs84":  "KML (WGS84 / EPSG:4326)",
+    "coordinateConverter":  "Chuyển đổi tọa độ",
+    "utmWgs84":  "UTM ↔ WGS84",
+    "editData":  "Chỉnh sửa dữ liệu",
+    "geometryAndAttributes":  "Hình học / thuộc tính",
+    "exportingKml":  "Đang xuất KML...",
+    "exportGoogleEarth":  "Xuất sang Google Earth",
+    "exportingDxf":  "Đang xuất DXF...",
+    "exportAutoCad":  "Xuất sang AutoCAD",
+    "dxfAscii":  "DXF ASCII",
+    "exportPdf":  "Xuất sang PDF",
+    "drawingAndMap":  "Bản vẽ / Bản đồ",
+    "dataLayers":  "CÁC LỚP DỮ LIỆU",
+    "noDataLayers":  "Chưa có lớp dữ liệu.",
+    "visible":  "Đang hiển thị",
+    "layersVisible":  "{visibleCount}/{totalCount} layer đang hiển thị",
+    "@layersVisible":  {
+                           "placeholders":  {
+                                                "visibleCount":  {
+                                                                     "type":  "int"
+                                                                 },
+                                                "totalCount":  {
+                                                                   "type":  "int"
+                                                               }
+                                            }
+                       },
+    "objectsVisible":  "{count} đối tượng hiển thị",
+    "@objectsVisible":  {
+                            "placeholders":  {
+                                                 "count":  {
+                                                               "type":  "int"
+                                                           }
+                                             }
+                        },
+    "addDataHint":  "Hãy thêm bản vẽ AutoCAD hoặc dữ liệu Google Earth.",
+    "projectContentSummary":  "{layerCount} lớp • {featureCount} đối tượng",
+    "@projectContentSummary":  {
+                                   "placeholders":  {
+                                                        "layerCount":  {
+                                                                           "type":  "int"
+                                                                       },
+                                                        "featureCount":  {
+                                                                             "type":  "int"
+                                                                         }
+                                                    }
+                               }
 }

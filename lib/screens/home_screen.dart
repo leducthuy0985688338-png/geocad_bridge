@@ -25,6 +25,7 @@ import '../widgets/coordinate_converter_dialog.dart';
 import '../widgets/layer_georeference_dialog.dart';
 import '../widgets/map_canvas.dart';
 import '../widgets/unsaved_changes_dialog.dart';
+import '../l10n/generated/app_localizations.dart';
 
 typedef ProjectSavePathSelector = Future<String?> Function({
   required String suggestedName,
@@ -1314,6 +1315,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Shortcuts(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.keyZ, control: true): _UndoIntent(),
@@ -1347,22 +1350,22 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               actions: [
                 IconButton(
-                  tooltip: 'Project mới',
+                  tooltip: l10n.projectNew,
                   onPressed: _hasBlockingProjectOperation ? null : _newProject,
                   icon: const Icon(Icons.note_add_outlined),
                 ),
                 IconButton(
-                  tooltip: 'Mở project',
+                  tooltip: l10n.projectOpen,
                   onPressed: _hasBlockingProjectOperation ? null : _openProject,
                   icon: const Icon(Icons.folder_open),
                 ),
                 IconButton(
-                  tooltip: 'Lưu project',
+                  tooltip: l10n.projectSave,
                   onPressed: _hasBlockingProjectOperation ? null : _saveProject,
                   icon: const Icon(Icons.save_outlined),
                 ),
                 IconButton(
-                  tooltip: 'Lưu project thành...',
+                  tooltip: l10n.projectSaveAs,
                   onPressed: _hasBlockingProjectOperation
                       ? null
                       : _saveProjectAs,
@@ -1482,6 +1485,8 @@ class _LeftPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       color: const Color(0xFFF4F6F8),
       child: Column(
@@ -1490,9 +1495,9 @@ class _LeftPanel extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Text(
-                  'CÔNG CỤ',
-                  style: TextStyle(
+                Text(
+                  l10n.tools,
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey,
@@ -1502,64 +1507,64 @@ class _LeftPanel extends StatelessWidget {
                 _ToolButton(
                   icon: Icons.folder_open,
                   title: isImporting
-                      ? 'Đang đọc bản vẽ...'
-                      : 'Thêm bản vẽ AutoCAD',
-                  subtitle: 'Chọn nhiều DWG / DXF',
+                      ? l10n.importingCad
+                      : l10n.addAutoCadDrawing,
+                  subtitle: l10n.selectMultipleDwgDxf,
                   onPressed: isImporting ? null : onOpenCadFiles,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
                   icon: Icons.public,
                   title: isImporting
-                      ? 'Đang đọc dữ liệu...'
-                      : 'Thêm dữ liệu Google Earth',
-                  subtitle: 'KML (WGS84 / EPSG:4326)',
+                      ? l10n.importingGoogleEarth
+                      : l10n.addGoogleEarthData,
+                  subtitle: l10n.kmlWgs84,
                   onPressed: isImporting ? null : onOpenGoogleEarthFiles,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
                   icon: Icons.sync_alt,
-                  title: 'Chuyển đổi tọa độ',
-                  subtitle: 'UTM ↔ WGS84',
+                  title: l10n.coordinateConverter,
+                  subtitle: l10n.utmWgs84,
                   onPressed: onOpenCoordinateConverter,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
                   icon: Icons.edit_location_alt,
-                  title: 'Chỉnh sửa dữ liệu',
-                  subtitle: 'Hình học / thuộc tính',
+                  title: l10n.editData,
+                  subtitle: l10n.geometryAndAttributes,
                   onPressed: () {},
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
                   icon: Icons.map,
                   title: isExporting
-                      ? 'Đang xuất KML...'
-                      : 'Xuất sang Google Earth',
-                  subtitle: 'KML (WGS84 / EPSG:4326)',
+                      ? l10n.exportingKml
+                      : l10n.exportGoogleEarth,
+                  subtitle: l10n.kmlWgs84,
                   onPressed: isImporting || isExporting ? null : onExportKml,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
                   icon: Icons.architecture,
-                  title: isExporting ? 'Đang xuất DXF...' : 'Xuất sang AutoCAD',
-                  subtitle: 'DXF ASCII',
+                  title: isExporting ? l10n.exportingDxf : l10n.exportAutoCad,
+                  subtitle: l10n.dxfAscii,
                   onPressed: isImporting || isExporting ? null : onExportDxf,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
                   icon: Icons.picture_as_pdf,
-                  title: 'Xuất sang PDF',
-                  subtitle: 'Bản vẽ / Bản đồ',
+                  title: l10n.exportPdf,
+                  subtitle: l10n.drawingAndMap,
                   onPressed: () {},
                 ),
                 const SizedBox(height: 28),
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'CÁC LỚP DỮ LIỆU',
-                        style: TextStyle(
+                        l10n.dataLayers,
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Colors.grey,
@@ -1630,8 +1635,10 @@ class _LeftPanel extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(12),
             child: Text(
-              '${project.layerCount} lớp • '
-              '${project.featureCount} đối tượng',
+              l10n.projectContentSummary(
+                project.layerCount,
+                project.featureCount,
+              ),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
@@ -1990,6 +1997,8 @@ class _EmptyLayerPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -1998,11 +2007,10 @@ class _EmptyLayerPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE0E0E0)),
       ),
-      child: const Text(
-        'Chưa có lớp dữ liệu.\n'
-        'Hãy thêm bản vẽ AutoCAD hoặc dữ liệu Google Earth.',
+      child: Text(
+        '${l10n.noDataLayers}\n${l10n.addDataHint}',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 12, color: Colors.grey),
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
       ),
     );
   }
@@ -2268,6 +2276,7 @@ class _WorkspaceHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -2311,7 +2320,7 @@ class _WorkspaceHeader extends StatelessWidget {
           const SizedBox(width: 20),
           _HeaderInfo(
             icon: Icons.visibility,
-            label: 'Đang hiển thị',
+            label: l10n.visible,
             value: '${project.visibleFeatures.length}',
           ),
         ],
@@ -2362,6 +2371,7 @@ class _WorkspaceStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final visibleLayerCount = project.visibleLayers.length;
 
     return Container(
@@ -2373,12 +2383,12 @@ class _WorkspaceStatusBar extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '$visibleLayerCount/${project.layerCount} layer đang hiển thị',
+              l10n.layersVisible(visibleLayerCount, project.layerCount),
               style: const TextStyle(fontSize: 11, color: Colors.black54),
             ),
           ),
           Text(
-            '${project.visibleFeatures.length} đối tượng hiển thị',
+            l10n.objectsVisible(project.visibleFeatures.length),
             style: const TextStyle(fontSize: 11, color: Colors.black54),
           ),
         ],

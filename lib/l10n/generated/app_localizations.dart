@@ -103,7 +103,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In vi, this message translates to:
-  /// **'GeoCAD Bridge'**
+  /// **'AutoCAD ↔ Google Earth'**
   String get appTitle;
 
   /// No description provided for @language.
@@ -135,6 +135,180 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'English'**
   String get english;
+
+  /// No description provided for @projectNew.
+  ///
+  /// In vi, this message translates to:
+  /// **'Project mới'**
+  String get projectNew;
+
+  /// No description provided for @projectOpen.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mở project'**
+  String get projectOpen;
+
+  /// No description provided for @projectSave.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lưu project'**
+  String get projectSave;
+
+  /// No description provided for @projectSaveAs.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lưu project thành...'**
+  String get projectSaveAs;
+
+  /// No description provided for @tools.
+  ///
+  /// In vi, this message translates to:
+  /// **'CÔNG CỤ'**
+  String get tools;
+
+  /// No description provided for @importingCad.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang đọc bản vẽ...'**
+  String get importingCad;
+
+  /// No description provided for @addAutoCadDrawing.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thêm bản vẽ AutoCAD'**
+  String get addAutoCadDrawing;
+
+  /// No description provided for @selectMultipleDwgDxf.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn nhiều DWG / DXF'**
+  String get selectMultipleDwgDxf;
+
+  /// No description provided for @importingGoogleEarth.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang đọc dữ liệu...'**
+  String get importingGoogleEarth;
+
+  /// No description provided for @addGoogleEarthData.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thêm dữ liệu Google Earth'**
+  String get addGoogleEarthData;
+
+  /// No description provided for @kmlWgs84.
+  ///
+  /// In vi, this message translates to:
+  /// **'KML (WGS84 / EPSG:4326)'**
+  String get kmlWgs84;
+
+  /// No description provided for @coordinateConverter.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chuyển đổi tọa độ'**
+  String get coordinateConverter;
+
+  /// No description provided for @utmWgs84.
+  ///
+  /// In vi, this message translates to:
+  /// **'UTM ↔ WGS84'**
+  String get utmWgs84;
+
+  /// No description provided for @editData.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉnh sửa dữ liệu'**
+  String get editData;
+
+  /// No description provided for @geometryAndAttributes.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hình học / thuộc tính'**
+  String get geometryAndAttributes;
+
+  /// No description provided for @exportingKml.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang xuất KML...'**
+  String get exportingKml;
+
+  /// No description provided for @exportGoogleEarth.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xuất sang Google Earth'**
+  String get exportGoogleEarth;
+
+  /// No description provided for @exportingDxf.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang xuất DXF...'**
+  String get exportingDxf;
+
+  /// No description provided for @exportAutoCad.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xuất sang AutoCAD'**
+  String get exportAutoCad;
+
+  /// No description provided for @dxfAscii.
+  ///
+  /// In vi, this message translates to:
+  /// **'DXF ASCII'**
+  String get dxfAscii;
+
+  /// No description provided for @exportPdf.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xuất sang PDF'**
+  String get exportPdf;
+
+  /// No description provided for @drawingAndMap.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bản vẽ / Bản đồ'**
+  String get drawingAndMap;
+
+  /// No description provided for @dataLayers.
+  ///
+  /// In vi, this message translates to:
+  /// **'CÁC LỚP DỮ LIỆU'**
+  String get dataLayers;
+
+  /// No description provided for @noDataLayers.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có lớp dữ liệu.'**
+  String get noDataLayers;
+
+  /// No description provided for @visible.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang hiển thị'**
+  String get visible;
+
+  /// No description provided for @layersVisible.
+  ///
+  /// In vi, this message translates to:
+  /// **'{visibleCount}/{totalCount} layer đang hiển thị'**
+  String layersVisible(int visibleCount, int totalCount);
+
+  /// No description provided for @objectsVisible.
+  ///
+  /// In vi, this message translates to:
+  /// **'{count} đối tượng hiển thị'**
+  String objectsVisible(int count);
+
+  /// No description provided for @addDataHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hãy thêm bản vẽ AutoCAD hoặc dữ liệu Google Earth.'**
+  String get addDataHint;
+
+  /// No description provided for @projectContentSummary.
+  ///
+  /// In vi, this message translates to:
+  /// **'{layerCount} lớp • {featureCount} đối tượng'**
+  String projectContentSummary(int layerCount, int featureCount);
 }
 
 class _AppLocalizationsDelegate

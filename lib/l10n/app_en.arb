@@ -1,9 +1,65 @@
-﻿{
-  "@@locale": "en",
-  "appTitle": "GeoCAD Bridge",
-  "language": "Language",
-  "selectLanguage": "Select language",
-  "vietnamese": "Tiếng Việt",
-  "lao": "ລາວ",
-  "english": "English"
+{
+    "@@locale":  "en",
+    "appTitle":  "AutoCAD ↔ Google Earth",
+    "language":  "Language",
+    "selectLanguage":  "Select language",
+    "vietnamese":  "Tiếng Việt",
+    "lao":  "ລາວ",
+    "english":  "English",
+    "projectNew":  "New project",
+    "projectOpen":  "Open project",
+    "projectSave":  "Save project",
+    "projectSaveAs":  "Save project as...",
+    "tools":  "TOOLS",
+    "importingCad":  "Reading drawing...",
+    "addAutoCadDrawing":  "Add AutoCAD drawing",
+    "selectMultipleDwgDxf":  "Select multiple DWG / DXF files",
+    "importingGoogleEarth":  "Reading data...",
+    "addGoogleEarthData":  "Add Google Earth data",
+    "kmlWgs84":  "KML (WGS84 / EPSG:4326)",
+    "coordinateConverter":  "Coordinate converter",
+    "utmWgs84":  "UTM ↔ WGS84",
+    "editData":  "Edit data",
+    "geometryAndAttributes":  "Geometry / attributes",
+    "exportingKml":  "Exporting KML...",
+    "exportGoogleEarth":  "Export to Google Earth",
+    "exportingDxf":  "Exporting DXF...",
+    "exportAutoCad":  "Export to AutoCAD",
+    "dxfAscii":  "DXF ASCII",
+    "exportPdf":  "Export to PDF",
+    "drawingAndMap":  "Drawing / Map",
+    "dataLayers":  "DATA LAYERS",
+    "noDataLayers":  "No data layers.",
+    "visible":  "Visible",
+    "layersVisible":  "{visibleCount}/{totalCount} layers visible",
+    "@layersVisible":  {
+                           "placeholders":  {
+                                                "visibleCount":  {
+                                                                     "type":  "int"
+                                                                 },
+                                                "totalCount":  {
+                                                                   "type":  "int"
+                                                               }
+                                            }
+                       },
+    "objectsVisible":  "{count} objects visible",
+    "@objectsVisible":  {
+                            "placeholders":  {
+                                                 "count":  {
+                                                               "type":  "int"
+                                                           }
+                                             }
+                        },
+    "addDataHint":  "Add an AutoCAD drawing or Google Earth data.",
+    "projectContentSummary":  "{layerCount} layers • {featureCount} objects",
+    "@projectContentSummary":  {
+                                   "placeholders":  {
+                                                        "layerCount":  {
+                                                                           "type":  "int"
+                                                                       },
+                                                        "featureCount":  {
+                                                                             "type":  "int"
+                                                                         }
+                                                    }
+                               }
 }

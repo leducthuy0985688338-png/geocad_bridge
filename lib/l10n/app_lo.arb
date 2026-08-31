@@ -1,9 +1,65 @@
-﻿{
-  "@@locale": "lo",
-  "appTitle": "GeoCAD Bridge",
-  "language": "ພາສາ",
-  "selectLanguage": "ເລືອກພາສາ",
-  "vietnamese": "Tiếng Việt",
-  "lao": "ລາວ",
-  "english": "English"
+{
+    "@@locale":  "lo",
+    "appTitle":  "AutoCAD ↔ Google Earth",
+    "language":  "ພາສາ",
+    "selectLanguage":  "ເລືອກພາສາ",
+    "vietnamese":  "Tiếng Việt",
+    "lao":  "ລາວ",
+    "english":  "English",
+    "projectNew":  "ໂຄງການໃໝ່",
+    "projectOpen":  "ເປີດໂຄງການ",
+    "projectSave":  "ບັນທຶກໂຄງການ",
+    "projectSaveAs":  "ບັນທຶກໂຄງການເປັນ...",
+    "tools":  "ເຄື່ອງມື",
+    "importingCad":  "ກຳລັງອ່ານແບບ...",
+    "addAutoCadDrawing":  "ເພີ່ມແບບ AutoCAD",
+    "selectMultipleDwgDxf":  "ເລືອກຫຼາຍໄຟລ໌ DWG / DXF",
+    "importingGoogleEarth":  "ກຳລັງອ່ານຂໍ້ມູນ...",
+    "addGoogleEarthData":  "ເພີ່ມຂໍ້ມູນ Google Earth",
+    "kmlWgs84":  "KML (WGS84 / EPSG:4326)",
+    "coordinateConverter":  "ແປງພິກັດ",
+    "utmWgs84":  "UTM ↔ WGS84",
+    "editData":  "ແກ້ໄຂຂໍ້ມູນ",
+    "geometryAndAttributes":  "ເລຂາຄະນິດ / ຄຸນລັກສະນະ",
+    "exportingKml":  "ກຳລັງສົ່ງອອກ KML...",
+    "exportGoogleEarth":  "ສົ່ງອອກໄປ Google Earth",
+    "exportingDxf":  "ກຳລັງສົ່ງອອກ DXF...",
+    "exportAutoCad":  "ສົ່ງອອກໄປ AutoCAD",
+    "dxfAscii":  "DXF ASCII",
+    "exportPdf":  "ສົ່ງອອກເປັນ PDF",
+    "drawingAndMap":  "ແບບ / ແຜນທີ່",
+    "dataLayers":  "ຊັ້ນຂໍ້ມູນ",
+    "noDataLayers":  "ຍັງບໍ່ມີຊັ້ນຂໍ້ມູນ.",
+    "visible":  "ກຳລັງສະແດງ",
+    "layersVisible":  "ກຳລັງສະແດງ {visibleCount}/{totalCount} ຊັ້ນ",
+    "@layersVisible":  {
+                           "placeholders":  {
+                                                "visibleCount":  {
+                                                                     "type":  "int"
+                                                                 },
+                                                "totalCount":  {
+                                                                   "type":  "int"
+                                                               }
+                                            }
+                       },
+    "objectsVisible":  "ກຳລັງສະແດງ {count} ວັດຖຸ",
+    "@objectsVisible":  {
+                            "placeholders":  {
+                                                 "count":  {
+                                                               "type":  "int"
+                                                           }
+                                             }
+                        },
+    "addDataHint":  "ເພີ່ມແບບ AutoCAD ຫຼື ຂໍ້ມູນ Google Earth.",
+    "projectContentSummary":  "{layerCount} ຊັ້ນ • {featureCount} ວັດຖຸ",
+    "@projectContentSummary":  {
+                                   "placeholders":  {
+                                                        "layerCount":  {
+                                                                           "type":  "int"
+                                                                       },
+                                                        "featureCount":  {
+                                                                             "type":  "int"
+                                                                         }
+                                                    }
+                               }
 }
