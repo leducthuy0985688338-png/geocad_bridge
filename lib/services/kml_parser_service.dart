@@ -103,7 +103,7 @@ class KmlParserService {
     final file = File(path);
 
     if (!await file.exists()) {
-      throw ArgumentError('KhÃ´ng tÃ¬m tháº¥y file KML: $path');
+      throw ArgumentError('Không tìm thấy file KML: $path');
     }
 
     final content = await file.readAsString(encoding: utf8);
@@ -116,7 +116,7 @@ class KmlParserService {
     try {
       document = XmlDocument.parse(content);
     } on XmlParserException catch (error) {
-      throw FormatException('KML khÃ´ng há»£p lá»‡: ${error.message}');
+      throw FormatException('KML không hợp lệ: ${error.message}');
     }
 
     final features = <MapFeature>[];
@@ -160,7 +160,7 @@ class KmlParserService {
               placemarkIndex: placemarkCount,
               placemarkName: name,
               geometryType: localName,
-              message: 'Geometry $localName chÆ°a Ä‘Æ°á»£c GeoCAD há»— trá»£.',
+              message: 'Geometry $localName chưa được GeoCAD hỗ trợ.',
             ),
           );
           continue;
@@ -180,7 +180,7 @@ class KmlParserService {
               placemarkIndex: placemarkCount,
               placemarkName: name,
               geometryType: localName,
-              message: 'Polygon cÃ³ innerBoundaryIs (polygon cÃ³ lá»—) chÆ°a Ä‘Æ°á»£c model GeoCAD há»— trá»£; geometry Ä‘Ã£ bá»‹ bá» qua Ä‘á»ƒ trÃ¡nh máº¥t fidelity.',
+              message: 'Polygon có innerBoundaryIs (polygon có lỗ) chưa được model GeoCAD hỗ trợ; geometry đã bị bỏ qua để tránh mất fidelity.',
             ),
           );
           continue;
@@ -200,11 +200,7 @@ class KmlParserService {
             );
 
             if (coordinates.length != 1) {
-              throw _geometryError(
-                name,
-                localName,
-                'pháº£i cÃ³ Ä‘Ãºng 1 bá»™ tá»a Ä‘á»™',
-              );
+              throw _geometryError(name, localName, 'phải có đúng 1 bộ tọa độ');
             }
 
             _preserveAltitudeMode(
@@ -239,7 +235,7 @@ class KmlParserService {
               throw _geometryError(
                 name,
                 localName,
-                'pháº£i cÃ³ Ã­t nháº¥t 2 bá»™ tá»a Ä‘á»™',
+                'phải có ít nhất 2 bộ tọa độ',
               );
             }
 
@@ -270,12 +266,12 @@ class KmlParserService {
               'outerBoundaryIs',
             );
             if (outerBoundary == null) {
-              throw _geometryError(name, localName, 'thiáº¿u outerBoundaryIs');
+              throw _geometryError(name, localName, 'thiếu outerBoundaryIs');
             }
 
             final linearRing = _firstDirectChild(outerBoundary, 'LinearRing');
             if (linearRing == null) {
-              throw _geometryError(name, localName, 'thiáº¿u LinearRing');
+              throw _geometryError(name, localName, 'thiếu LinearRing');
             }
 
             final coordinates = _coordinatesFromGeometry(
@@ -396,7 +392,7 @@ class KmlParserService {
           placemarkName: placemarkName,
           geometryType: geometryType,
           message:
-              'altitudeMode "$altitudeMode" Ä‘Æ°á»£c giá»¯ nguyÃªn nhÆ°ng semantics chÆ°a Ä‘Æ°á»£c GeoCAD xÃ¡c nháº­n há»— trá»£.',
+              'altitudeMode "$altitudeMode" được giữ nguyên nhưng semantics chưa được GeoCAD xác nhận hỗ trợ.',
         ),
       );
     }
@@ -411,7 +407,7 @@ class KmlParserService {
       throw _geometryError(
         placemarkName,
         geometryType,
-        'outer LinearRing pháº£i cÃ³ Ã­t nháº¥t 4 bá»™ tá»a Ä‘á»™',
+        'outer LinearRing phải có ít nhất 4 bộ tọa độ',
       );
     }
 
@@ -421,7 +417,7 @@ class KmlParserService {
       throw _geometryError(
         placemarkName,
         geometryType,
-        'outer LinearRing pháº£i khÃ©p kÃ­n (tá»a Ä‘á»™ Ä‘áº§u vÃ  cuá»‘i pháº£i trÃ¹ng nhau)',
+        'outer LinearRing phải khép kín (tọa độ đầu và cuối phải trùng nhau)',
       );
     }
 
@@ -433,7 +429,7 @@ class KmlParserService {
       throw _geometryError(
         placemarkName,
         geometryType,
-        'outer LinearRing pháº£i cÃ³ Ã­t nháº¥t 3 Ä‘á»‰nh phÃ¢n biá»‡t',
+        'outer LinearRing phải có ít nhất 3 đỉnh phân biệt',
       );
     }
   }
@@ -446,7 +442,7 @@ class KmlParserService {
     final element = _firstDirectChild(geometry, 'coordinates');
 
     if (element == null) {
-      throw _geometryError(placemarkName, geometryType, 'thiáº¿u coordinates');
+      throw _geometryError(placemarkName, geometryType, 'thiếu coordinates');
     }
 
     return _parseCoordinates(
@@ -480,7 +476,7 @@ class KmlParserService {
           geometryType,
           tupleIndex,
           tuple,
-          'pháº£i cÃ³ dáº¡ng longitude,latitude[,altitude]',
+          'phải có dạng longitude,latitude[,altitude]',
         );
       }
 
@@ -496,7 +492,7 @@ class KmlParserService {
           geometryType,
           tupleIndex,
           tuple,
-          'longitude/latitude pháº£i lÃ  sá»‘ há»¯u háº¡n',
+          'longitude/latitude phải là số hữu hạn',
         );
       }
 
@@ -506,7 +502,7 @@ class KmlParserService {
           geometryType,
           tupleIndex,
           tuple,
-          'longitude pháº£i náº±m trong [-180, 180]',
+          'longitude phải nằm trong [-180, 180]',
         );
       }
 
@@ -516,7 +512,7 @@ class KmlParserService {
           geometryType,
           tupleIndex,
           tuple,
-          'latitude pháº£i náº±m trong [-90, 90]',
+          'latitude phải nằm trong [-90, 90]',
         );
       }
 
@@ -529,7 +525,7 @@ class KmlParserService {
             geometryType,
             tupleIndex,
             tuple,
-            'altitude pháº£i lÃ  sá»‘ há»¯u háº¡n',
+            'altitude phải là số hữu hạn',
           );
         }
       }
@@ -545,7 +541,7 @@ class KmlParserService {
     String geometryType,
     String message,
   ) {
-    final displayName = placemarkName.isEmpty ? '(khÃ´ng tÃªn)' : placemarkName;
+    final displayName = placemarkName.isEmpty ? '(không tên)' : placemarkName;
     return FormatException(
       'Placemark "$displayName", $geometryType: $message.',
     );
@@ -561,7 +557,7 @@ class KmlParserService {
     return _geometryError(
       placemarkName,
       geometryType,
-      'tá»a Ä‘á»™ #$tupleIndex "$tuple" khÃ´ng há»£p lá»‡: $message',
+      'tọa độ #$tupleIndex "$tuple" không hợp lệ: $message',
     );
   }
 

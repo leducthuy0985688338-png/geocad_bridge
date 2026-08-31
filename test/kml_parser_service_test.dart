@@ -352,6 +352,51 @@ void main() {
     );
   });
 
+  test('preserves Vietnamese Lao and English Unicode metadata', () {
+    const kml = '''
+<kml><Document>
+<Placemark>
+<name>Tiếng Việt – Đường thử nghiệm</name>
+<description>Mô tả tiếng Việt</description>
+<ExtendedData><Data name="label"><value>Tiếng Việt – Đường thử nghiệm</value></Data></ExtendedData>
+<Point><coordinates>106,16</coordinates></Point>
+</Placemark>
+<Placemark>
+<name>ພາສາລາວ – ທົດສອບ</name>
+<description>ຄຳອະທິບາຍພາສາລາວ</description>
+<ExtendedData><Data name="label"><value>ພາສາລາວ – ທົດສອບ</value></Data></ExtendedData>
+<Point><coordinates>107,17</coordinates></Point>
+</Placemark>
+<Placemark>
+<name>English – Test feature</name>
+<description>English description</description>
+<ExtendedData><Data name="label"><value>English – Test feature</value></Data></ExtendedData>
+<Point><coordinates>108,18</coordinates></Point>
+</Placemark>
+</Document></kml>
+''';
+
+    final result = service.parseString(kml);
+
+    expect(result.features.map((feature) => feature.name), [
+      'Tiếng Việt – Đường thử nghiệm',
+      'ພາສາລາວ – ທົດສອບ',
+      'English – Test feature',
+    ]);
+    expect(result.features.map((feature) => feature.description), [
+      'Mô tả tiếng Việt',
+      'ຄຳອະທິບາຍພາສາລາວ',
+      'English description',
+    ]);
+    expect(result.features.map((feature) => feature.properties['label']), [
+      'Tiếng Việt – Đường thử nghiệm',
+      'ພາສາລາວ – ທົດສອບ',
+      'English – Test feature',
+    ]);
+    expect(result.diagnostics.parsedGeometryCount, 3);
+    expect(result.diagnostics.hasIssues, isFalse);
+  });
+
   test('structurally invalid XML remains a whole-document failure', () {
     expect(
       () => service.parseString('<kml><Placemark>'),

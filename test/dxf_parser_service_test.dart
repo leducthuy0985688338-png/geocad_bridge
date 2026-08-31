@@ -840,6 +840,36 @@ Label
       throwsUnsupportedError,
     );
   });
+
+  test('preserves Vietnamese Lao and English Unicode TEXT content', () async {
+    const labels = [
+      'Tiếng Việt – Đường thử nghiệm',
+      'ພາສາລາວ – ທົດສອບ',
+      'English – Test feature',
+    ];
+
+    for (final label in labels) {
+      final result = await parseEntities('''
+0
+TEXT
+8
+UNICODE
+10
+106
+20
+16
+1
+$label
+''');
+
+      expect(result.features.single.type, MapFeatureType.text);
+      expect(result.features.single.name, label);
+      expect(result.features.single.properties['cadLayer'], 'UNICODE');
+      expect(result.diagnostics.parsedEntityCount, 1);
+      expect(result.diagnostics.hasIssues, isFalse);
+    }
+  });
+
   group('DXF R12 POLYLINE / VERTEX / SEQEND', () {
     test('parses open and closed POLYLINE as logical entities', () async {
       final open = await parseRaw(
