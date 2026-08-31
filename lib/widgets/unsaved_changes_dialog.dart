@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
+
 enum UnsavedChangesDecision { save, discard, cancel }
 
 class UnsavedChangesDialog extends StatelessWidget {
@@ -7,30 +9,28 @@ class UnsavedChangesDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('Project có thay đổi chưa lưu'),
-      content: const Text(
-        'Nếu tiếp tục, các thay đổi chưa lưu có thể bị mất. '
-        'Bạn muốn lưu project trước không?',
-      ),
+      title: Text(l10n.unsavedChangesTitle),
+      content: Text(l10n.unsavedChangesMessage),
       actions: [
         TextButton(
           key: const Key('unsaved-cancel'),
           onPressed: () =>
               Navigator.of(context).pop(UnsavedChangesDecision.cancel),
-          child: const Text('Hủy'),
+          child: Text(l10n.cancel),
         ),
         TextButton(
           key: const Key('unsaved-discard'),
           onPressed: () =>
               Navigator.of(context).pop(UnsavedChangesDecision.discard),
-          child: const Text('Không lưu'),
+          child: Text(l10n.discardChanges),
         ),
         FilledButton(
           key: const Key('unsaved-save'),
           onPressed: () =>
               Navigator.of(context).pop(UnsavedChangesDecision.save),
-          child: const Text('Lưu'),
+          child: Text(l10n.save),
         ),
       ],
     );

@@ -126,11 +126,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _projectPath = null;
       _projectCreatedAt = now;
     });
-    _showMessage('Đã tạo project mới.');
+    _showMessage(AppLocalizations.of(context).projectCreated);
   }
 
   Future<void> _openProject() async {
     if (_hasBlockingProjectOperation) return;
+    final l10n = AppLocalizations.of(context);
     if (!await _prepareForDestructiveAction() || !mounted) return;
     final override = widget.openProjectOverride;
     if (override != null) {
@@ -140,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (loaded == null || !mounted) return;
         _applyLoadedProject(loaded, path: null);
       } catch (error) {
-        _showMessage('Không thể mở project: $error');
+        _showMessage(l10n.projectOpenFailed(error.toString()));
       } finally {
         if (mounted) setState(() => _isProjectBusy = false);
       }
@@ -149,12 +150,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['geocad'],
-      dialogTitle: 'Mở GeoCAD Project',
+      dialogTitle: l10n.openGeoCadProject,
     );
     if (files.isEmpty || !mounted) return;
     final path = files.single.path;
     if (path == null || path.isEmpty) {
-      _showMessage('Không lấy được đường dẫn project.');
+      _showMessage(l10n.projectPathUnavailable);
       return;
     }
 
@@ -164,12 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       _applyLoadedProject(loaded, path: path);
       if (loaded.warnings.isEmpty) {
-        _showMessage('Đã mở project "${loaded.project.name}".');
+        _showMessage(l10n.projectOpened(loaded.project.name));
       } else {
         await _showProjectWarnings(loaded.warnings);
       }
     } catch (error) {
-      _showMessage('Không thể mở project: $error');
+      _showMessage(l10n.projectOpenFailed(error.toString()));
     } finally {
       if (mounted) setState(() => _isProjectBusy = false);
     }
@@ -200,7 +201,9 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _dirtyState.markSaved(projectBeingSaved));
         return true;
       } catch (error) {
-        _showMessage('Không thể lưu project: $error');
+        _showMessage(
+          AppLocalizations.of(context).projectSaveFailed(error.toString()),
+        );
         return false;
       } finally {
         if (mounted) setState(() => _isProjectBusy = false);
@@ -235,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
       suggestedName: suggestedName,
       acceptedTypeGroups: [
         file_selector.XTypeGroup(
-          label: 'GeoCAD Project',
+          label: AppLocalizations.of(context).geoCadProject,
           extensions: allowedExtensions,
         ),
       ],
@@ -261,10 +264,12 @@ class _HomeScreenState extends State<HomeScreen> {
         if (updateCurrentPath) _projectPath = path;
         _dirtyState.markSaved(projectBeingSaved);
       });
-      _showMessage('Đã lưu project: $path');
+      _showMessage(AppLocalizations.of(context).projectSaved(path));
       return true;
     } catch (error) {
-      _showMessage('Không thể lưu project: $error');
+      _showMessage(
+        AppLocalizations.of(context).projectSaveFailed(error.toString()),
+      );
       return false;
     } finally {
       if (mounted) setState(() => _isProjectBusy = false);
@@ -346,6 +351,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openCadFiles() async {
     if (_isImporting || _isProjectBusy) return;
+    final l10n = AppLocalizations.of(context);
 
     final selector = widget.cadDocumentsSelectorOverride;
     final documents = selector != null
@@ -382,7 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
               diagnostics: diagnostics,
             ));
           } else if (layer == null) {
-            errors.add('${document.name}: Không có entity DXF hợp lệ.');
+            errors.add(l10n.dxfNoValidEntities(document.name));
           }
         } catch (error) {
           errors.add('${document.name}: $error');
@@ -409,12 +415,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       if (newLayers.isEmpty && errors.isEmpty) {
-        _showMessage('Các file đã chọn đều đang có trong dự án.');
+        _showMessage(l10n.selectedFilesAlreadyInProject);
         return;
       }
 
       if (errors.isEmpty) {
-        _showMessage('Đã thêm ${newLayers.length} bản vẽ vào dự án.');
+        _showMessage(l10n.cadDrawingsAdded(newLayers.length));
         return;
       }
 
@@ -430,11 +436,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openGoogleEarthFiles() async {
     if (_isImporting || _isProjectBusy) return;
+    final l10n = AppLocalizations.of(context);
 
     final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['kml'],
-      dialogTitle: 'Chọn dữ liệu Google Earth (KML)',
+      dialogTitle: l10n.selectGoogleEarthKml,
     );
 
     if (files.isEmpty || !mounted) {
@@ -454,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final path = file.path;
 
         if (path == null || path.trim().isEmpty) {
-          errors.add('${file.name}: Không lấy được đường dẫn file.');
+          errors.add(l10n.filePathUnavailable(file.name));
           continue;
         }
 
@@ -467,10 +474,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final parsed = await _kmlParserService.parseFile(path);
 
           if (parsed.features.isEmpty) {
-            errors.add(
-              '${file.name}: Không tìm thấy Point, '
-              'LineString hoặc Polygon hợp lệ.',
-            );
+            errors.add(l10n.kmlNoValidGeometry(file.name));
             continue;
           }
 
@@ -509,19 +513,16 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       if (newLayers.isEmpty && errors.isEmpty && skippedCount > 0) {
-        _showMessage('Các file KML đã chọn đều đang có trong dự án.');
+        _showMessage(l10n.selectedKmlAlreadyInProject);
         return;
       }
 
       if (errors.isEmpty) {
         final skippedText = skippedCount > 0
-            ? ' • Bỏ qua $skippedCount file đã có.'
+            ? l10n.skippedExistingFiles(skippedCount)
             : '';
 
-        _showMessage(
-          'Đã thêm ${newLayers.length} file KML '
-          'vào dự án.$skippedText',
-        );
+        _showMessage(l10n.kmlFilesAdded(newLayers.length, skippedText));
         return;
       }
 
@@ -792,12 +793,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (ownerLayer == null) {
-      _showMessage('Không tìm thấy layer chứa đối tượng.');
+      _showMessage(AppLocalizations.of(context).featureOwnerLayerNotFound);
       return;
     }
 
     if (ownerLayer.locked) {
-      _showMessage('Layer "${ownerLayer.name}" đang bị khóa.');
+      _showMessage(AppLocalizations.of(context).layerLocked(ownerLayer.name));
       return;
     }
 
@@ -937,7 +938,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!sourceLayer.isCad ||
         !sourceLayer.crs.isLocalCad ||
         sourceLayer.features.isEmpty) {
-      _showMessage('Chỉ có thể định vị layer CAD cục bộ có dữ liệu hình học.');
+      _showMessage(AppLocalizations.of(context).georeferenceLocalCadOnly);
       return;
     }
 
@@ -969,13 +970,17 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
       _showMessage(
-        'Đã định vị "${sourceLayer.name}": '
-        '${result.transformedCoordinateCount} tọa độ • '
-        '${request.targetCrs.displayName} • '
-        'RMSE ${result.rmse.toStringAsFixed(4)} m.',
+        AppLocalizations.of(context).georeferenceSucceeded(
+          sourceLayer.name,
+          result.transformedCoordinateCount,
+          request.targetCrs.displayName,
+          result.rmse.toStringAsFixed(4),
+        ),
       );
     } catch (error) {
-      _showMessage('Không thể định vị layer: $error');
+      _showMessage(
+        AppLocalizations.of(context).georeferenceLayerFailed(error.toString()),
+      );
     }
   }
 
@@ -983,14 +988,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isProjectBusy) return;
     if (!sourceLayer.canTransformToWgs84) {
       _showMessage(
-        'Layer "${sourceLayer.name}" chưa có CRS hợp lệ. '
-        'Hãy thiết lập CRS trước.',
+        AppLocalizations.of(context).layerNeedsValidCrs(sourceLayer.name),
       );
       return;
     }
 
     if (sourceLayer.crs.isWgs84) {
-      _showMessage('Layer "${sourceLayer.name}" đã là WGS84 (EPSG:4326).');
+      _showMessage(
+        AppLocalizations.of(context).layerAlreadyWgs84(sourceLayer.name),
+      );
       return;
     }
 
@@ -1009,19 +1015,22 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
       _showMessage(
-        'Đã tạo layer WGS84: '
-        '${result.transformedFeatureCount} đối tượng, '
-        '${result.transformedCoordinateCount} tọa độ.',
+        AppLocalizations.of(context).wgs84LayerCreated(
+          result.transformedFeatureCount,
+          result.transformedCoordinateCount,
+        ),
       );
     } catch (error) {
-      _showMessage('Không thể tạo layer WGS84: $error');
+      _showMessage(
+        AppLocalizations.of(context).createWgs84Failed(error.toString()),
+      );
     }
   }
 
   Future<void> _createUtmLayer(MapLayer sourceLayer) async {
     if (_isProjectBusy || _isImporting || _isExporting) return;
     if (!sourceLayer.crs.isWgs84 || sourceLayer.features.isEmpty) {
-      _showMessage('Chỉ có thể tạo UTM từ layer WGS84 có dữ liệu hình học.');
+      _showMessage(AppLocalizations.of(context).createUtmFromWgs84Only);
       return;
     }
 
@@ -1032,7 +1041,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : null;
     if (targetCrs == null || !mounted) return;
     if (!targetCrs.isUtm || !targetCrs.isValid) {
-      _showMessage('CRS UTM đích không hợp lệ.');
+      _showMessage(AppLocalizations.of(context).invalidTargetUtmCrs);
       return;
     }
 
@@ -1048,12 +1057,16 @@ class _HomeScreenState extends State<HomeScreen> {
         _project = _project.addLayer(result.layer);
       });
       _showMessage(
-        'Đã tạo layer ${targetCrs.displayName}: '
-        '${result.transformedFeatureCount} đối tượng, '
-        '${result.transformedCoordinateCount} tọa độ.',
+        AppLocalizations.of(context).utmLayerCreated(
+          targetCrs.displayName,
+          result.transformedFeatureCount,
+          result.transformedCoordinateCount,
+        ),
       );
     } catch (error) {
-      _showMessage('Không thể tạo layer UTM: $error');
+      _showMessage(
+        AppLocalizations.of(context).createUtmFailed(error.toString()),
+      );
     }
   }
 
@@ -1068,6 +1081,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _exportKml() async {
     if (_isExporting || _isImporting) return;
+    final l10n = AppLocalizations.of(context);
 
     final exportLayers = _project.visibleLayers
         .where(
@@ -1078,7 +1092,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
 
     if (exportLayers.isEmpty) {
-      _showMessage('Không có dữ liệu đang hiển thị để xuất KML.');
+      _showMessage(l10n.noVisibleDataForKml);
       return;
     }
 
@@ -1102,7 +1116,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       final outputUri = await FilePicker.saveFile(
-        dialogTitle: 'Xuất dữ liệu Google Earth (KML)',
+        dialogTitle: l10n.exportGoogleEarthKml,
         fileName: '${_safeFileName(_project.name)}.kml',
         bytes: bytes,
         mimeType: 'application/vnd.google-earth.kml+xml',
@@ -1116,7 +1130,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       await _showKmlExportSuccessDialog(outputUri);
     } catch (error) {
-      _showMessage('Không thể xuất KML: $error');
+      _showMessage(l10n.exportKmlFailed(error.toString()));
     } finally {
       if (mounted) {
         setState(() {
@@ -1136,7 +1150,9 @@ class _HomeScreenState extends State<HomeScreen> {
         layers: _project.layers,
       );
     } catch (error) {
-      _showMessage('Không thể xuất DXF: $error');
+      _showMessage(
+        AppLocalizations.of(context).exportDxfFailed(error.toString()),
+      );
       return;
     }
 
@@ -1147,7 +1163,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final outputUri = widget.saveDxfOverride != null
           ? await widget.saveDxfOverride!(result.bytes)
           : await FilePicker.saveFile(
-              dialogTitle: 'Xuất bản vẽ AutoCAD (DXF ASCII)',
+              dialogTitle: AppLocalizations.of(context).exportAutoCadDxfAscii,
               fileName: '${_safeFileName(_project.name)}.dxf',
               bytes: result.bytes,
               mimeType: 'application/dxf',
@@ -1160,14 +1176,20 @@ class _HomeScreenState extends State<HomeScreen> {
           : outputUri.toString();
       final warnings = result.warnings.isEmpty
           ? ''
-          : ' • ${result.warnings.length} cảnh báo';
+          : AppLocalizations.of(context).exportWarnings(result.warnings.length);
       _showMessage(
-        'Đã xuất ${result.entityCount} đối tượng trên '
-        '${result.layerCount} CAD layer • '
-        '${result.exportedCrs.displayName}$warnings • $path',
+        AppLocalizations.of(context).dxfExportSucceeded(
+          result.entityCount,
+          result.layerCount,
+          result.exportedCrs.displayName,
+          warnings,
+          path,
+        ),
       );
     } catch (error) {
-      _showMessage('Không thể ghi file DXF: $error');
+      _showMessage(
+        AppLocalizations.of(context).writeDxfFailed(error.toString()),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -1250,8 +1272,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openKmlInGoogleEarth(Uri outputUri) async {
+    final l10n = AppLocalizations.of(context);
     if (!Platform.isWindows || outputUri.scheme != 'file') {
-      _showMessage('Chỉ hỗ trợ mở KML tự động trên Windows desktop.');
+      _showMessage(l10n.autoOpenKmlWindowsOnly);
       return;
     }
 
@@ -1262,19 +1285,11 @@ class _HomeScreenState extends State<HomeScreen> {
         path,
       ], mode: ProcessStartMode.detached);
 
-      _showMessage(
-        'Đã gửi file KML tới ứng dụng mặc định. '
-        'Nếu Google Earth chưa được cài đặt, '
-        'Windows sẽ yêu cầu chọn ứng dụng.',
-      );
+      _showMessage(l10n.kmlSentToDefaultApp);
     } on ProcessException catch (error) {
-      _showMessage(
-        'Windows không thể mở file KML. '
-        'Hãy kiểm tra Google Earth hoặc ứng dụng mặc định: '
-        '${error.message}',
-      );
+      _showMessage(l10n.windowsOpenKmlFailed(error.message));
     } catch (error) {
-      _showMessage('Không thể mở file KML: $error');
+      _showMessage(l10n.openKmlFailed(error.toString()));
     }
   }
 
@@ -1287,10 +1302,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _updateLayerCrs(MapLayer layer, CoordinateReferenceSystem crs) {
     if (_isProjectBusy) return;
     if (!layer.crs.isLocalCad) {
-      _showMessage(
-        'CRS của "${layer.name}" đã được xác định. '
-        'Hãy dùng chức năng chuyển đổi tọa độ thay vì gán lại metadata.',
-      );
+      _showMessage(AppLocalizations.of(context).crsAlreadyDefined(layer.name));
       return;
     }
     if (layer.crs.type == crs.type &&
@@ -1305,7 +1317,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _project = _project.updateLayer(layer.withCrs(crs));
     });
 
-    _showMessage('Đã đặt CRS cho "${layer.name}": ${crs.displayName}');
+    _showMessage(
+      AppLocalizations.of(context).crsAssigned(layer.name, crs.displayName),
+    );
   }
 
   @override

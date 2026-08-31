@@ -421,4 +421,228 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get outlierMultipleLargeResiduals =>
       'Nhiều residual cần được kiểm tra tổng thể.';
+
+  @override
+  String get unsavedChangesTitle => 'Project có thay đổi chưa lưu';
+
+  @override
+  String get unsavedChangesMessage =>
+      'Nếu tiếp tục, các thay đổi chưa lưu có thể bị mất. Bạn muốn lưu project trước không?';
+
+  @override
+  String get discardChanges => 'Không lưu';
+
+  @override
+  String get save => 'Lưu';
+
+  @override
+  String get projectCreated => 'Đã tạo project mới.';
+
+  @override
+  String projectOpenFailed(Object error) {
+    return 'Không thể mở project: $error';
+  }
+
+  @override
+  String get openGeoCadProject => 'Mở GeoCAD Project';
+
+  @override
+  String get projectPathUnavailable => 'Không lấy được đường dẫn project.';
+
+  @override
+  String projectOpened(Object name) {
+    return 'Đã mở project \"$name\".';
+  }
+
+  @override
+  String projectSaveFailed(Object error) {
+    return 'Không thể lưu project: $error';
+  }
+
+  @override
+  String get geoCadProject => 'GeoCAD Project';
+
+  @override
+  String projectSaved(Object path) {
+    return 'Đã lưu project: $path';
+  }
+
+  @override
+  String dxfNoValidEntities(Object fileName) {
+    return '$fileName: Không có entity DXF hợp lệ.';
+  }
+
+  @override
+  String get selectedFilesAlreadyInProject =>
+      'Các file đã chọn đều đang có trong dự án.';
+
+  @override
+  String cadDrawingsAdded(Object count) {
+    return 'Đã thêm $count bản vẽ vào dự án.';
+  }
+
+  @override
+  String get selectGoogleEarthKml => 'Chọn dữ liệu Google Earth (KML)';
+
+  @override
+  String filePathUnavailable(Object fileName) {
+    return '$fileName: Không lấy được đường dẫn file.';
+  }
+
+  @override
+  String kmlNoValidGeometry(Object fileName) {
+    return '$fileName: Không tìm thấy Point, LineString hoặc Polygon hợp lệ.';
+  }
+
+  @override
+  String get selectedKmlAlreadyInProject =>
+      'Các file KML đã chọn đều đang có trong dự án.';
+
+  @override
+  String skippedExistingFiles(Object count) {
+    return ' • Bỏ qua $count file đã có.';
+  }
+
+  @override
+  String kmlFilesAdded(Object count, Object skippedText) {
+    return 'Đã thêm $count file KML vào dự án.$skippedText';
+  }
+
+  @override
+  String get featureOwnerLayerNotFound =>
+      'Không tìm thấy layer chứa đối tượng.';
+
+  @override
+  String layerLocked(Object name) {
+    return 'Layer \"$name\" đang bị khóa.';
+  }
+
+  @override
+  String get georeferenceLocalCadOnly =>
+      'Chỉ có thể định vị layer CAD cục bộ có dữ liệu hình học.';
+
+  @override
+  String georeferenceSucceeded(
+    Object coordinateCount,
+    Object crs,
+    Object name,
+    Object rmse,
+  ) {
+    return 'Đã định vị \"$name\": $coordinateCount tọa độ • $crs • RMSE $rmse m.';
+  }
+
+  @override
+  String georeferenceLayerFailed(Object error) {
+    return 'Không thể định vị layer: $error';
+  }
+
+  @override
+  String layerNeedsValidCrs(Object name) {
+    return 'Layer \"$name\" chưa có CRS hợp lệ. Hãy thiết lập CRS trước.';
+  }
+
+  @override
+  String layerAlreadyWgs84(Object name) {
+    return 'Layer \"$name\" đã là WGS84 (EPSG:4326).';
+  }
+
+  @override
+  String wgs84LayerCreated(Object coordinateCount, Object featureCount) {
+    return 'Đã tạo layer WGS84: $featureCount đối tượng, $coordinateCount tọa độ.';
+  }
+
+  @override
+  String createWgs84Failed(Object error) {
+    return 'Không thể tạo layer WGS84: $error';
+  }
+
+  @override
+  String get createUtmFromWgs84Only =>
+      'Chỉ có thể tạo UTM từ layer WGS84 có dữ liệu hình học.';
+
+  @override
+  String get invalidTargetUtmCrs => 'CRS UTM đích không hợp lệ.';
+
+  @override
+  String utmLayerCreated(
+    Object coordinateCount,
+    Object crs,
+    Object featureCount,
+  ) {
+    return 'Đã tạo layer $crs: $featureCount đối tượng, $coordinateCount tọa độ.';
+  }
+
+  @override
+  String createUtmFailed(Object error) {
+    return 'Không thể tạo layer UTM: $error';
+  }
+
+  @override
+  String get noVisibleDataForKml =>
+      'Không có dữ liệu đang hiển thị để xuất KML.';
+
+  @override
+  String get exportGoogleEarthKml => 'Xuất dữ liệu Google Earth (KML)';
+
+  @override
+  String exportKmlFailed(Object error) {
+    return 'Không thể xuất KML: $error';
+  }
+
+  @override
+  String exportDxfFailed(Object error) {
+    return 'Không thể xuất DXF: $error';
+  }
+
+  @override
+  String get exportAutoCadDxfAscii => 'Xuất bản vẽ AutoCAD (DXF ASCII)';
+
+  @override
+  String exportWarnings(Object count) {
+    return ' • $count cảnh báo';
+  }
+
+  @override
+  String dxfExportSucceeded(
+    Object crs,
+    Object entityCount,
+    Object layerCount,
+    Object path,
+    Object warnings,
+  ) {
+    return 'Đã xuất $entityCount đối tượng trên $layerCount CAD layer • $crs$warnings • $path';
+  }
+
+  @override
+  String writeDxfFailed(Object error) {
+    return 'Không thể ghi file DXF: $error';
+  }
+
+  @override
+  String get autoOpenKmlWindowsOnly =>
+      'Chỉ hỗ trợ mở KML tự động trên Windows desktop.';
+
+  @override
+  String get kmlSentToDefaultApp =>
+      'Đã gửi file KML tới ứng dụng mặc định. Nếu Google Earth chưa được cài đặt, Windows sẽ yêu cầu chọn ứng dụng.';
+
+  @override
+  String windowsOpenKmlFailed(Object error) {
+    return 'Windows không thể mở file KML. Hãy kiểm tra Google Earth hoặc ứng dụng mặc định: $error';
+  }
+
+  @override
+  String openKmlFailed(Object error) {
+    return 'Không thể mở file KML: $error';
+  }
+
+  @override
+  String crsAlreadyDefined(Object name) {
+    return 'CRS của \"$name\" đã được xác định. Hãy dùng chức năng chuyển đổi tọa độ thay vì gán lại metadata.';
+  }
+
+  @override
+  String crsAssigned(Object crs, Object name) {
+    return 'Đã đặt CRS cho \"$name\": $crs';
+  }
 }

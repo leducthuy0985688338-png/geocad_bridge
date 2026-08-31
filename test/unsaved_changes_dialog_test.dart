@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:autocad_googleearth/l10n/generated/app_localizations.dart';
 import 'package:autocad_googleearth/widgets/unsaved_changes_dialog.dart';
 
 void main() {
@@ -11,6 +12,9 @@ void main() {
     UnsavedChangesDecision? result;
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => FilledButton(
             onPressed: () async {

@@ -819,6 +819,309 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Nhiều residual cần được kiểm tra tổng thể.'**
   String get outlierMultipleLargeResiduals;
+
+  /// No description provided for @unsavedChangesTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Project có thay đổi chưa lưu'**
+  String get unsavedChangesTitle;
+
+  /// No description provided for @unsavedChangesMessage.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nếu tiếp tục, các thay đổi chưa lưu có thể bị mất. Bạn muốn lưu project trước không?'**
+  String get unsavedChangesMessage;
+
+  /// No description provided for @discardChanges.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không lưu'**
+  String get discardChanges;
+
+  /// No description provided for @save.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lưu'**
+  String get save;
+
+  /// No description provided for @projectCreated.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã tạo project mới.'**
+  String get projectCreated;
+
+  /// No description provided for @projectOpenFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể mở project: {error}'**
+  String projectOpenFailed(Object error);
+
+  /// No description provided for @openGeoCadProject.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mở GeoCAD Project'**
+  String get openGeoCadProject;
+
+  /// No description provided for @projectPathUnavailable.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không lấy được đường dẫn project.'**
+  String get projectPathUnavailable;
+
+  /// No description provided for @projectOpened.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã mở project \"{name}\".'**
+  String projectOpened(Object name);
+
+  /// No description provided for @projectSaveFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể lưu project: {error}'**
+  String projectSaveFailed(Object error);
+
+  /// No description provided for @geoCadProject.
+  ///
+  /// In vi, this message translates to:
+  /// **'GeoCAD Project'**
+  String get geoCadProject;
+
+  /// No description provided for @projectSaved.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã lưu project: {path}'**
+  String projectSaved(Object path);
+
+  /// No description provided for @dxfNoValidEntities.
+  ///
+  /// In vi, this message translates to:
+  /// **'{fileName}: Không có entity DXF hợp lệ.'**
+  String dxfNoValidEntities(Object fileName);
+
+  /// No description provided for @selectedFilesAlreadyInProject.
+  ///
+  /// In vi, this message translates to:
+  /// **'Các file đã chọn đều đang có trong dự án.'**
+  String get selectedFilesAlreadyInProject;
+
+  /// No description provided for @cadDrawingsAdded.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã thêm {count} bản vẽ vào dự án.'**
+  String cadDrawingsAdded(Object count);
+
+  /// No description provided for @selectGoogleEarthKml.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn dữ liệu Google Earth (KML)'**
+  String get selectGoogleEarthKml;
+
+  /// No description provided for @filePathUnavailable.
+  ///
+  /// In vi, this message translates to:
+  /// **'{fileName}: Không lấy được đường dẫn file.'**
+  String filePathUnavailable(Object fileName);
+
+  /// No description provided for @kmlNoValidGeometry.
+  ///
+  /// In vi, this message translates to:
+  /// **'{fileName}: Không tìm thấy Point, LineString hoặc Polygon hợp lệ.'**
+  String kmlNoValidGeometry(Object fileName);
+
+  /// No description provided for @selectedKmlAlreadyInProject.
+  ///
+  /// In vi, this message translates to:
+  /// **'Các file KML đã chọn đều đang có trong dự án.'**
+  String get selectedKmlAlreadyInProject;
+
+  /// No description provided for @skippedExistingFiles.
+  ///
+  /// In vi, this message translates to:
+  /// **' • Bỏ qua {count} file đã có.'**
+  String skippedExistingFiles(Object count);
+
+  /// No description provided for @kmlFilesAdded.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã thêm {count} file KML vào dự án.{skippedText}'**
+  String kmlFilesAdded(Object count, Object skippedText);
+
+  /// No description provided for @featureOwnerLayerNotFound.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không tìm thấy layer chứa đối tượng.'**
+  String get featureOwnerLayerNotFound;
+
+  /// No description provided for @layerLocked.
+  ///
+  /// In vi, this message translates to:
+  /// **'Layer \"{name}\" đang bị khóa.'**
+  String layerLocked(Object name);
+
+  /// No description provided for @georeferenceLocalCadOnly.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉ có thể định vị layer CAD cục bộ có dữ liệu hình học.'**
+  String get georeferenceLocalCadOnly;
+
+  /// No description provided for @georeferenceSucceeded.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã định vị \"{name}\": {coordinateCount} tọa độ • {crs} • RMSE {rmse} m.'**
+  String georeferenceSucceeded(
+    Object coordinateCount,
+    Object crs,
+    Object name,
+    Object rmse,
+  );
+
+  /// No description provided for @georeferenceLayerFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể định vị layer: {error}'**
+  String georeferenceLayerFailed(Object error);
+
+  /// No description provided for @layerNeedsValidCrs.
+  ///
+  /// In vi, this message translates to:
+  /// **'Layer \"{name}\" chưa có CRS hợp lệ. Hãy thiết lập CRS trước.'**
+  String layerNeedsValidCrs(Object name);
+
+  /// No description provided for @layerAlreadyWgs84.
+  ///
+  /// In vi, this message translates to:
+  /// **'Layer \"{name}\" đã là WGS84 (EPSG:4326).'**
+  String layerAlreadyWgs84(Object name);
+
+  /// No description provided for @wgs84LayerCreated.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã tạo layer WGS84: {featureCount} đối tượng, {coordinateCount} tọa độ.'**
+  String wgs84LayerCreated(Object coordinateCount, Object featureCount);
+
+  /// No description provided for @createWgs84Failed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể tạo layer WGS84: {error}'**
+  String createWgs84Failed(Object error);
+
+  /// No description provided for @createUtmFromWgs84Only.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉ có thể tạo UTM từ layer WGS84 có dữ liệu hình học.'**
+  String get createUtmFromWgs84Only;
+
+  /// No description provided for @invalidTargetUtmCrs.
+  ///
+  /// In vi, this message translates to:
+  /// **'CRS UTM đích không hợp lệ.'**
+  String get invalidTargetUtmCrs;
+
+  /// No description provided for @utmLayerCreated.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã tạo layer {crs}: {featureCount} đối tượng, {coordinateCount} tọa độ.'**
+  String utmLayerCreated(
+    Object coordinateCount,
+    Object crs,
+    Object featureCount,
+  );
+
+  /// No description provided for @createUtmFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể tạo layer UTM: {error}'**
+  String createUtmFailed(Object error);
+
+  /// No description provided for @noVisibleDataForKml.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không có dữ liệu đang hiển thị để xuất KML.'**
+  String get noVisibleDataForKml;
+
+  /// No description provided for @exportGoogleEarthKml.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xuất dữ liệu Google Earth (KML)'**
+  String get exportGoogleEarthKml;
+
+  /// No description provided for @exportKmlFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể xuất KML: {error}'**
+  String exportKmlFailed(Object error);
+
+  /// No description provided for @exportDxfFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể xuất DXF: {error}'**
+  String exportDxfFailed(Object error);
+
+  /// No description provided for @exportAutoCadDxfAscii.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xuất bản vẽ AutoCAD (DXF ASCII)'**
+  String get exportAutoCadDxfAscii;
+
+  /// No description provided for @exportWarnings.
+  ///
+  /// In vi, this message translates to:
+  /// **' • {count} cảnh báo'**
+  String exportWarnings(Object count);
+
+  /// No description provided for @dxfExportSucceeded.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã xuất {entityCount} đối tượng trên {layerCount} CAD layer • {crs}{warnings} • {path}'**
+  String dxfExportSucceeded(
+    Object crs,
+    Object entityCount,
+    Object layerCount,
+    Object path,
+    Object warnings,
+  );
+
+  /// No description provided for @writeDxfFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể ghi file DXF: {error}'**
+  String writeDxfFailed(Object error);
+
+  /// No description provided for @autoOpenKmlWindowsOnly.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉ hỗ trợ mở KML tự động trên Windows desktop.'**
+  String get autoOpenKmlWindowsOnly;
+
+  /// No description provided for @kmlSentToDefaultApp.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã gửi file KML tới ứng dụng mặc định. Nếu Google Earth chưa được cài đặt, Windows sẽ yêu cầu chọn ứng dụng.'**
+  String get kmlSentToDefaultApp;
+
+  /// No description provided for @windowsOpenKmlFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Windows không thể mở file KML. Hãy kiểm tra Google Earth hoặc ứng dụng mặc định: {error}'**
+  String windowsOpenKmlFailed(Object error);
+
+  /// No description provided for @openKmlFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể mở file KML: {error}'**
+  String openKmlFailed(Object error);
+
+  /// No description provided for @crsAlreadyDefined.
+  ///
+  /// In vi, this message translates to:
+  /// **'CRS của \"{name}\" đã được xác định. Hãy dùng chức năng chuyển đổi tọa độ thay vì gán lại metadata.'**
+  String crsAlreadyDefined(Object name);
+
+  /// No description provided for @crsAssigned.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã đặt CRS cho \"{name}\": {crs}'**
+  String crsAssigned(Object crs, Object name);
 }
 
 class _AppLocalizationsDelegate

@@ -418,4 +418,226 @@ class AppLocalizationsLo extends AppLocalizations {
   @override
   String get outlierMultipleLargeResiduals =>
       'ມີ residual ຫຼາຍຄ່າທີ່ຕ້ອງກວດສອບໂດຍລວມ.';
+
+  @override
+  String get unsavedChangesTitle => 'Project ມີການປ່ຽນແປງທີ່ຍັງບໍ່ໄດ້ບັນທຶກ';
+
+  @override
+  String get unsavedChangesMessage =>
+      'ຖ້າສືບຕໍ່ ການປ່ຽນແປງທີ່ຍັງບໍ່ໄດ້ບັນທຶກອາດສູນເສຍ. ຕ້ອງການບັນທຶກ project ກ່ອນບໍ?';
+
+  @override
+  String get discardChanges => 'ບໍ່ບັນທຶກ';
+
+  @override
+  String get save => 'ບັນທຶກ';
+
+  @override
+  String get projectCreated => 'ສ້າງ project ໃໝ່ແລ້ວ.';
+
+  @override
+  String projectOpenFailed(Object error) {
+    return 'ບໍ່ສາມາດເປີດ project: $error';
+  }
+
+  @override
+  String get openGeoCadProject => 'ເປີດ GeoCAD Project';
+
+  @override
+  String get projectPathUnavailable => 'ບໍ່ສາມາດຮັບ path ຂອງ project.';
+
+  @override
+  String projectOpened(Object name) {
+    return 'ເປີດ project \"$name\" ແລ້ວ.';
+  }
+
+  @override
+  String projectSaveFailed(Object error) {
+    return 'ບໍ່ສາມາດບັນທຶກ project: $error';
+  }
+
+  @override
+  String get geoCadProject => 'GeoCAD Project';
+
+  @override
+  String projectSaved(Object path) {
+    return 'ບັນທຶກ project ແລ້ວ: $path';
+  }
+
+  @override
+  String dxfNoValidEntities(Object fileName) {
+    return '$fileName: ບໍ່ພົບ entity DXF ທີ່ຖືກຕ້ອງ.';
+  }
+
+  @override
+  String get selectedFilesAlreadyInProject =>
+      'ໄຟລ໌ທີ່ເລືອກທັງໝົດມີຢູ່ໃນ project ແລ້ວ.';
+
+  @override
+  String cadDrawingsAdded(Object count) {
+    return 'ເພີ່ມ $count ແບບເຂົ້າ project ແລ້ວ.';
+  }
+
+  @override
+  String get selectGoogleEarthKml => 'ເລືອກຂໍ້ມູນ Google Earth (KML)';
+
+  @override
+  String filePathUnavailable(Object fileName) {
+    return '$fileName: ບໍ່ສາມາດຮັບ path ຂອງໄຟລ໌.';
+  }
+
+  @override
+  String kmlNoValidGeometry(Object fileName) {
+    return '$fileName: ບໍ່ພົບ Point, LineString ຫຼື Polygon ທີ່ຖືກຕ້ອງ.';
+  }
+
+  @override
+  String get selectedKmlAlreadyInProject =>
+      'ໄຟລ໌ KML ທີ່ເລືອກທັງໝົດມີຢູ່ໃນ project ແລ້ວ.';
+
+  @override
+  String skippedExistingFiles(Object count) {
+    return ' • ຂ້າມ $count ໄຟລ໌ທີ່ມີແລ້ວ.';
+  }
+
+  @override
+  String kmlFilesAdded(Object count, Object skippedText) {
+    return 'ເພີ່ມ $count ໄຟລ໌ KML ເຂົ້າ project ແລ້ວ.$skippedText';
+  }
+
+  @override
+  String get featureOwnerLayerNotFound => 'ບໍ່ພົບ layer ທີ່ມີວັດຖຸນີ້.';
+
+  @override
+  String layerLocked(Object name) {
+    return 'Layer \"$name\" ຖືກລັອກ.';
+  }
+
+  @override
+  String get georeferenceLocalCadOnly =>
+      'ສາມາດ georeference ໄດ້ສະເພາະ local CAD layer ທີ່ມີ geometry.';
+
+  @override
+  String georeferenceSucceeded(
+    Object coordinateCount,
+    Object crs,
+    Object name,
+    Object rmse,
+  ) {
+    return 'Georeference \"$name\" ສຳເລັດ: $coordinateCount ພິກັດ • $crs • RMSE $rmse m.';
+  }
+
+  @override
+  String georeferenceLayerFailed(Object error) {
+    return 'ບໍ່ສາມາດ georeference layer: $error';
+  }
+
+  @override
+  String layerNeedsValidCrs(Object name) {
+    return 'Layer \"$name\" ຍັງບໍ່ມີ CRS ທີ່ຖືກຕ້ອງ. ກຳນົດ CRS ກ່ອນ.';
+  }
+
+  @override
+  String layerAlreadyWgs84(Object name) {
+    return 'Layer \"$name\" ເປັນ WGS84 (EPSG:4326) ແລ້ວ.';
+  }
+
+  @override
+  String wgs84LayerCreated(Object coordinateCount, Object featureCount) {
+    return 'ສ້າງ layer WGS84 ແລ້ວ: $featureCount ວັດຖຸ, $coordinateCount ພິກັດ.';
+  }
+
+  @override
+  String createWgs84Failed(Object error) {
+    return 'ບໍ່ສາມາດສ້າງ layer WGS84: $error';
+  }
+
+  @override
+  String get createUtmFromWgs84Only =>
+      'ສາມາດສ້າງ UTM ໄດ້ສະເພາະຈາກ WGS84 layer ທີ່ມີ geometry.';
+
+  @override
+  String get invalidTargetUtmCrs => 'CRS UTM ປາຍທາງບໍ່ຖືກຕ້ອງ.';
+
+  @override
+  String utmLayerCreated(
+    Object coordinateCount,
+    Object crs,
+    Object featureCount,
+  ) {
+    return 'ສ້າງ layer $crs ແລ້ວ: $featureCount ວັດຖຸ, $coordinateCount ພິກັດ.';
+  }
+
+  @override
+  String createUtmFailed(Object error) {
+    return 'ບໍ່ສາມາດສ້າງ layer UTM: $error';
+  }
+
+  @override
+  String get noVisibleDataForKml => 'ບໍ່ມີຂໍ້ມູນທີ່ກຳລັງສະແດງເພື່ອ export KML.';
+
+  @override
+  String get exportGoogleEarthKml => 'Export ຂໍ້ມູນ Google Earth (KML)';
+
+  @override
+  String exportKmlFailed(Object error) {
+    return 'ບໍ່ສາມາດ export KML: $error';
+  }
+
+  @override
+  String exportDxfFailed(Object error) {
+    return 'ບໍ່ສາມາດ export DXF: $error';
+  }
+
+  @override
+  String get exportAutoCadDxfAscii => 'Export ແບບ AutoCAD (DXF ASCII)';
+
+  @override
+  String exportWarnings(Object count) {
+    return ' • $count ຄຳເຕືອນ';
+  }
+
+  @override
+  String dxfExportSucceeded(
+    Object crs,
+    Object entityCount,
+    Object layerCount,
+    Object path,
+    Object warnings,
+  ) {
+    return 'Export $entityCount ວັດຖຸໃນ $layerCount CAD layer • $crs$warnings • $path';
+  }
+
+  @override
+  String writeDxfFailed(Object error) {
+    return 'ບໍ່ສາມາດຂຽນໄຟລ໌ DXF: $error';
+  }
+
+  @override
+  String get autoOpenKmlWindowsOnly =>
+      'ການເປີດ KML ອັດຕະໂນມັດຮອງຮັບສະເພາະ Windows desktop.';
+
+  @override
+  String get kmlSentToDefaultApp =>
+      'ສົ່ງໄຟລ໌ KML ໄປຫາແອັບຄ່າເລີ່ມຕົ້ນແລ້ວ. ຖ້າບໍ່ໄດ້ຕິດຕັ້ງ Google Earth, Windows ຈະໃຫ້ເລືອກແອັບ.';
+
+  @override
+  String windowsOpenKmlFailed(Object error) {
+    return 'Windows ບໍ່ສາມາດເປີດໄຟລ໌ KML. ກວດ Google Earth ຫຼືແອັບຄ່າເລີ່ມຕົ້ນ: $error';
+  }
+
+  @override
+  String openKmlFailed(Object error) {
+    return 'ບໍ່ສາມາດເປີດໄຟລ໌ KML: $error';
+  }
+
+  @override
+  String crsAlreadyDefined(Object name) {
+    return 'CRS ຂອງ \"$name\" ຖືກກຳນົດແລ້ວ. ໃຫ້ໃຊ້ການປ່ຽນພິກັດແທນການກຳນົດ metadata ໃໝ່.';
+  }
+
+  @override
+  String crsAssigned(Object crs, Object name) {
+    return 'ກຳນົດ CRS ໃຫ້ \"$name\" ແລ້ວ: $crs';
+  }
 }
