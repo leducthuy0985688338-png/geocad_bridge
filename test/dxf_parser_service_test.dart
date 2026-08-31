@@ -44,6 +44,14 @@ EOF
     return service.parseFile(file.path);
   }
 
+  Future<DxfParseResult> parseRaw(String content) async {
+    final file = File(
+      '${tempDirectory.path}${Platform.pathSeparator}raw-${fileIndex++}.dxf',
+    );
+    await file.writeAsString(content);
+    return service.parseFile(file.path);
+  }
+
   test('parses CIRCLE as a smooth closed polyline and preserves Z', () async {
     final result = await parseEntities('''
 0
@@ -115,6 +123,101 @@ CURVES
       );
     },
   );
+
+  test('handles both extreme finite ARC angle directions safely', () async {
+    for (final angles in const [
+      (start: '1e308', end: '-1e308'),
+      (start: '-1e308', end: '1e308'),
+    ]) {
+      final result = await parseEntities('''
+0
+ARC
+10
+0
+20
+0
+40
+10
+50
+${angles.start}
+51
+${angles.end}
+''');
+
+      expect(result.diagnostics.totalEntityCount, 1);
+      expect(
+        result.diagnostics.parsedEntityCount +
+            result.diagnostics.malformedEntityCount,
+        1,
+      );
+      if (result.features.isNotEmpty) {
+        final feature = result.features.single;
+        expect(feature.coordinates.length - 1, lessThanOrEqualTo(72));
+        expect(
+          feature.coordinates.every(
+            (coordinate) => coordinate.x.isFinite && coordinate.y.isFinite,
+          ),
+          isTrue,
+        );
+      }
+    }
+  });
+
+  test('rejects extreme angles equivalent after normalization', () async {
+    final result = await parseEntities('''
+0
+ARC
+10
+0
+20
+0
+40
+10
+50
+1e308
+51
+1e308
+''');
+
+    expect(result.features, isEmpty);
+    expect(result.diagnostics.malformedEntityCount, 1);
+    expect(
+      result.diagnostics.issues.single.code,
+      DxfDiagnosticCode.invalidGeometry,
+    );
+  });
+
+  test('extreme valid ARC uses one bounded sweep semantic', () async {
+    final result = await parseEntities('''
+0
+ARC
+10
+100
+20
+200
+40
+10
+50
+1e308
+51
+10
+''');
+
+    final feature = result.features.single;
+    final sweep = double.parse(feature.properties['sweepAngleDegrees']!);
+    final segments = int.parse(feature.properties['approximationSegments']!);
+    expect(sweep, greaterThan(0));
+    expect(sweep, lessThanOrEqualTo(360));
+    expect(segments, (sweep / 5).ceil());
+    expect(segments, lessThanOrEqualTo(72));
+    expect(feature.coordinates, hasLength(segments + 1));
+    expect(
+      feature.coordinates.every(
+        (coordinate) => coordinate.x.isFinite && coordinate.y.isFinite,
+      ),
+      isTrue,
+    );
+  });
 
   test('parses TEXT content insertion point layer and elevation', () async {
     final result = await parseEntities(r'''
@@ -332,5 +435,409 @@ CLOSED
     expect(result.features[1].coordinates, hasLength(3));
     expect(result.features[1].properties['closed'], 'true');
     expect(result.features[1].properties['cadLayer'], 'CLOSED');
+  });
+
+  test('rejects odd line count and invalid group-code stream', () async {
+    await expectLater(
+      parseRaw('0\nSECTION\n2'),
+      throwsA(isA<DxfParserException>()),
+    );
+    await expectLater(
+      parseRaw('bad\nSECTION\n'),
+      throwsA(isA<DxfParserException>()),
+    );
+  });
+
+  test('skips NaN POINT and Infinity LINE with diagnostics', () async {
+    final result = await parseEntities('''
+0
+POINT
+10
+NaN
+20
+2
+0
+LINE
+10
+0
+20
+0
+11
+Infinity
+21
+1
+''');
+
+    expect(result.features, isEmpty);
+    expect(result.diagnostics.totalEntityCount, 2);
+    expect(result.diagnostics.malformedEntityCount, 2);
+    expect(
+      result.diagnostics.issues.map((issue) => issue.code),
+      everyElement(DxfDiagnosticCode.nonFiniteNumber),
+    );
+  });
+
+  test('reports malformed LINE CIRCLE ARC TEXT and MTEXT', () async {
+    final result = await parseEntities('''
+0
+LINE
+10
+0
+20
+0
+11
+1
+0
+CIRCLE
+10
+0
+20
+0
+40
+-1
+0
+ARC
+10
+0
+20
+0
+40
+1
+50
+10
+51
+10
+0
+TEXT
+10
+0
+20
+0
+1
+
+0
+MTEXT
+10
+0
+20
+0
+''');
+
+    expect(result.features, isEmpty);
+    expect(result.diagnostics.totalEntityCount, 5);
+    expect(result.diagnostics.malformedEntityCount, 5);
+    expect(result.diagnostics.skippedEntityCount, 5);
+  });
+
+  test('aggregates unsupported entity types deterministically', () async {
+    final result = await parseEntities('''
+0
+SPLINE
+8
+A
+0
+INSERT
+8
+B
+0
+SPLINE
+8
+C
+0
+HATCH
+8
+D
+''');
+
+    expect(result.features, isEmpty);
+    expect(result.diagnostics.unsupportedEntityCount, 4);
+    expect(result.diagnostics.unsupportedEntityCounts.keys, [
+      'HATCH',
+      'INSERT',
+      'SPLINE',
+    ]);
+    expect(result.diagnostics.unsupportedEntityCounts['SPLINE'], 2);
+    expect(result.diagnostics.issues.map((issue) => issue.entityIndex), [
+      1,
+      2,
+      3,
+      4,
+    ]);
+  });
+
+  test('parses finite bulge and elevation with fidelity warnings', () async {
+    final result = await parseEntities('''
+0
+LWPOLYLINE
+90
+2
+70
+0
+38
+4.5
+10
+0
+20
+0
+42
+0.5
+10
+1
+20
+1
+''');
+
+    expect(result.features, hasLength(1));
+    expect(result.diagnostics.malformedEntityCount, 0);
+    expect(result.diagnostics.hasFidelityWarnings, isTrue);
+    expect(
+      result.diagnostics.issues.map((issue) => issue.code),
+      containsAll([
+        DxfDiagnosticCode.lwPolylineBulgeNotPreserved,
+        DxfDiagnosticCode.lwPolylineElevationNotPreserved,
+      ]),
+    );
+  });
+
+  test('skips non-finite bulge and elevation', () async {
+    for (final specialPair in const ['42\nNaN', '38\nInfinity']) {
+      final result = await parseEntities('''
+0
+LWPOLYLINE
+90
+2
+70
+0
+$specialPair
+10
+0
+20
+0
+10
+1
+20
+1
+''');
+      expect(result.features, isEmpty);
+      expect(result.diagnostics.malformedEntityCount, 1);
+    }
+  });
+
+  test(
+    'accepts default OCS with warning and rejects non-default OCS',
+    () async {
+      Future<DxfParseResult> parseOcs(String z) => parseEntities('''
+0
+LWPOLYLINE
+90
+2
+210
+0
+220
+0
+230
+$z
+10
+0
+20
+0
+10
+1
+20
+1
+''');
+
+      final defaultOcs = await parseOcs('1');
+      expect(defaultOcs.features, hasLength(1));
+      expect(
+        defaultOcs.diagnostics.issues.single.code,
+        DxfDiagnosticCode.lwPolylineDefaultOcs,
+      );
+
+      final nonDefaultOcs = await parseOcs('-1');
+      expect(nonDefaultOcs.features, isEmpty);
+      expect(
+        nonDefaultOcs.diagnostics.issues.single.code,
+        DxfDiagnosticCode.lwPolylineOcsNotSupported,
+      );
+    },
+  );
+
+  test('rejects partial OCS and vertex count mismatch', () async {
+    final partialOcs = await parseEntities('''
+0
+LWPOLYLINE
+90
+2
+210
+0
+10
+0
+20
+0
+10
+1
+20
+1
+''');
+    expect(partialOcs.features, isEmpty);
+
+    final mismatch = await parseEntities('''
+0
+LWPOLYLINE
+90
+3
+10
+0
+20
+0
+10
+1
+20
+1
+''');
+    expect(mismatch.features, isEmpty);
+    expect(
+      mismatch.diagnostics.issues.single.code,
+      DxfDiagnosticCode.lwPolylineVertexCountMismatch,
+    );
+  });
+
+  test('missing vertex count preserves compatibility with warning', () async {
+    final result = await parseEntities('''
+0
+LWPOLYLINE
+10
+0
+20
+0
+10
+1
+20
+1
+''');
+
+    expect(result.features, hasLength(1));
+    expect(
+      result.diagnostics.issues.single.code,
+      DxfDiagnosticCode.lwPolylineVertexCountMissing,
+    );
+  });
+
+  test('rejects orphan invalid and insufficient polyline vertices', () async {
+    final fixtures = <String>[
+      '10\n0\n10\n1\n20\n1',
+      '20\n0\n10\n1\n20\n1',
+      '10\nbad\n20\n0\n10\n1\n20\n1',
+      '10\n0\n20\n0',
+      '70\n1\n10\n0\n20\n0\n10\n1\n20\n1',
+    ];
+    for (final data in fixtures) {
+      final result = await parseEntities('0\nLWPOLYLINE\n$data');
+      expect(result.features, isEmpty);
+      expect(result.diagnostics.malformedEntityCount, 1);
+    }
+  });
+
+  test('mixed file keeps valid order and diagnostics invariants', () async {
+    final result = await parseEntities('''
+0
+POINT
+10
+1
+20
+2
+0
+LINE
+10
+0
+20
+0
+11
+bad
+21
+1
+0
+INSERT
+8
+BLOCKS
+0
+TEXT
+10
+3
+20
+4
+1
+Label
+''');
+
+    expect(result.features, hasLength(2));
+    expect(result.features.map((feature) => feature.type), [
+      MapFeatureType.point,
+      MapFeatureType.text,
+    ]);
+    expect(result.features.map((feature) => feature.id), [
+      'dxf-point-0',
+      'dxf-text-1',
+    ]);
+    final diagnostics = result.diagnostics;
+    expect(diagnostics.totalEntityCount, 4);
+    expect(diagnostics.parsedEntityCount, result.features.length);
+    expect(diagnostics.malformedEntityCount, 1);
+    expect(diagnostics.unsupportedEntityCount, 1);
+    expect(
+      diagnostics.totalEntityCount,
+      diagnostics.parsedEntityCount +
+          diagnostics.malformedEntityCount +
+          diagnostics.unsupportedEntityCount,
+    );
+    expect(
+      result.features
+          .expand((feature) => feature.coordinates)
+          .every(
+            (coordinate) =>
+                coordinate.x.isFinite &&
+                coordinate.y.isFinite &&
+                (coordinate.z?.isFinite ?? true),
+          ),
+      isTrue,
+    );
+  });
+
+  test('diagnostics are immutable and deterministic', () async {
+    const entities = '0\nSPLINE\n0\nPOINT\n10\nNaN\n20\n1';
+    final first = await parseEntities(entities);
+    final second = await parseEntities(entities);
+
+    expect(
+      first.diagnostics.unsupportedEntityCounts,
+      second.diagnostics.unsupportedEntityCounts,
+    );
+    expect(
+      first.diagnostics.issues.map(
+        (issue) =>
+            (issue.code, issue.entityType, issue.entityIndex, issue.reason),
+      ),
+      second.diagnostics.issues.map(
+        (issue) =>
+            (issue.code, issue.entityType, issue.entityIndex, issue.reason),
+      ),
+    );
+    expect(
+      () => first.diagnostics.unsupportedEntityCounts['X'] = 1,
+      throwsUnsupportedError,
+    );
+    expect(
+      () => first.diagnostics.issues.add(
+        const DxfImportDiagnostic(
+          code: DxfDiagnosticCode.malformedEntity,
+          severity: DxfDiagnosticSeverity.error,
+          entityType: 'X',
+          entityIndex: 1,
+          reason: 'x',
+        ),
+      ),
+      throwsUnsupportedError,
+    );
   });
 }

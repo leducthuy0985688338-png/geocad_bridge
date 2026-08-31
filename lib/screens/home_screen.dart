@@ -31,6 +31,8 @@ typedef ProjectSavePathSelector = Future<String?> Function({
   required List<String> allowedExtensions,
 });
 
+typedef CadDocumentsSelector = Future<List<CadDocument>> Function();
+
 class HomeScreen extends StatefulWidget {
   final MapProject? initialProject;
   final Future<bool> Function(MapProject project)? saveProjectOverride;
@@ -39,6 +41,7 @@ class HomeScreen extends StatefulWidget {
   final Future<Uri?> Function(Uint8List bytes)? saveDxfOverride;
   final Future<CoordinateReferenceSystem?> Function(MapLayer layer)?
   selectUtmCrsOverride;
+  final CadDocumentsSelector? cadDocumentsSelectorOverride;
 
   const HomeScreen({
     super.key,
@@ -48,6 +51,7 @@ class HomeScreen extends StatefulWidget {
     this.openProjectOverride,
     this.saveDxfOverride,
     this.selectUtmCrsOverride,
+    this.cadDocumentsSelectorOverride,
   });
 
   @override
@@ -343,7 +347,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openCadFiles() async {
     if (_isImporting || _isProjectBusy) return;
 
-    final documents = await _cadFileService.pickCadFiles();
+    final selector = widget.cadDocumentsSelectorOverride;
+    final documents = selector != null
+        ? await selector()
+        : await _cadFileService.pickCadFiles();
 
     if (documents.isEmpty || !mounted) return;
 
@@ -353,6 +360,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final newLayers = <MapLayer>[];
     final errors = <String>[];
+    final dxfSummaries =
+        <({String fileName, DxfImportDiagnostics diagnostics})>[];
 
     try {
       for (final document in documents) {
@@ -361,8 +370,20 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         try {
-          final layer = await _createCadLayer(document);
-          newLayers.add(layer);
+          final importResult = await _createCadLayer(document);
+          final layer = importResult.layer;
+          final diagnostics = importResult.diagnostics;
+          if (layer != null) {
+            newLayers.add(layer);
+          }
+          if (diagnostics != null && diagnostics.hasIssues) {
+            dxfSummaries.add((
+              fileName: document.name,
+              diagnostics: diagnostics,
+            ));
+          } else if (layer == null) {
+            errors.add('${document.name}: Không có entity DXF hợp lệ.');
+          }
         } catch (error) {
           errors.add('${document.name}: $error');
         }
@@ -376,6 +397,15 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _project = _project.addLayers(newLayers);
         });
+      }
+
+      if (dxfSummaries.isNotEmpty) {
+        await _showDxfImportSummary(
+          summaries: dxfSummaries,
+          importedLayerCount: newLayers.length,
+          errors: errors,
+        );
+        return;
       }
 
       if (newLayers.isEmpty && errors.isEmpty) {
@@ -572,49 +602,148 @@ class _HomeScreenState extends State<HomeScreen> {
     return _project.layers.any((layer) => layer.sourcePath == path);
   }
 
-  Future<MapLayer> _createCadLayer(CadDocument document) async {
+  Future<void> _showDxfImportSummary({
+    required List<({String fileName, DxfImportDiagnostics diagnostics})>
+    summaries,
+    required int importedLayerCount,
+    required List<String> errors,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kết quả nhập DXF'),
+        content: SizedBox(
+          width: 600,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Đã thêm: $importedLayerCount layer DXF'),
+                const SizedBox(height: 12),
+                for (final summary in summaries) ...[
+                  Text(
+                    summary.fileName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Đã nhập: '
+                    '${summary.diagnostics.parsedEntityCount} entity',
+                  ),
+                  Text(
+                    'Malformed đã bỏ qua: '
+                    '${summary.diagnostics.malformedEntityCount}',
+                  ),
+                  Text(
+                    'Entity chưa hỗ trợ: '
+                    '${summary.diagnostics.unsupportedEntityCount}',
+                  ),
+                  for (final entry
+                      in summary.diagnostics.unsupportedEntityCounts.entries)
+                    Text('  • ${entry.key}: ${entry.value}'),
+                  if (summary.diagnostics.hasFidelityWarnings) ...[
+                    const SizedBox(height: 4),
+                    const Text('Cảnh báo fidelity:'),
+                    for (final entry in _aggregateDxfWarnings(
+                      summary.diagnostics,
+                    ).entries)
+                      Text('  • ${entry.value}× ${entry.key}'),
+                  ],
+                  const SizedBox(height: 12),
+                ],
+                if (errors.isNotEmpty) ...[
+                  const Text(
+                    'Các file không đọc được:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  for (final error in errors) Text('• $error'),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Map<String, int> _aggregateDxfWarnings(DxfImportDiagnostics diagnostics) {
+    final result = <String, int>{};
+    for (final issue in diagnostics.issues.where(
+      (issue) =>
+          issue.severity == DxfDiagnosticSeverity.warning &&
+          issue.code != DxfDiagnosticCode.unsupportedEntity,
+    )) {
+      result.update(issue.reason, (count) => count + 1, ifAbsent: () => 1);
+    }
+    return result;
+  }
+
+  Future<({MapLayer? layer, DxfImportDiagnostics? diagnostics})>
+  _createCadLayer(CadDocument document) async {
     switch (document.fileType) {
       case CadFileType.dxf:
         return _createDxfLayer(document);
 
       case CadFileType.dwg:
-        return MapLayer(
-          id: _createLayerId(),
-          name: document.name,
-          sourcePath: document.path,
-          sourceType: MapLayerSourceType.dwg,
-          properties: const {'geometryStatus': 'Chưa hỗ trợ đọc hình học DWG'},
+        return (
+          layer: MapLayer(
+            id: _createLayerId(),
+            name: document.name,
+            sourcePath: document.path,
+            sourceType: MapLayerSourceType.dwg,
+            properties: const {
+              'geometryStatus': 'Chưa hỗ trợ đọc hình học DWG',
+            },
+          ),
+          diagnostics: null,
         );
 
       case CadFileType.unknown:
-        return MapLayer(
-          id: _createLayerId(),
-          name: document.name,
-          sourcePath: document.path,
-          sourceType: MapLayerSourceType.manual,
+        return (
+          layer: MapLayer(
+            id: _createLayerId(),
+            name: document.name,
+            sourcePath: document.path,
+            sourceType: MapLayerSourceType.manual,
+          ),
+          diagnostics: null,
         );
     }
   }
 
-  Future<MapLayer> _createDxfLayer(CadDocument document) async {
+  Future<({MapLayer? layer, DxfImportDiagnostics diagnostics})> _createDxfLayer(
+    CadDocument document,
+  ) async {
     final result = await _dxfParserService.parseFile(document.path);
 
-    return MapLayer(
-      id: _createLayerId(),
-      name: document.name,
-      sourcePath: document.path,
-      sourceType: MapLayerSourceType.dxf,
-      features: result.features,
-      properties: {
-        'lineCount': result.lineCount.toString(),
-        'pairCount': result.pairCount.toString(),
-        'sectionCount': result.sections.length.toString(),
-        'sections': result.sections.join(', '),
-        'pointCount': result.pointCount.toString(),
-        'lineEntityCount': result.lineCountEntity.toString(),
-        'polylineCount': result.polylineCount.toString(),
-        'polygonCount': result.polygonCount.toString(),
-      },
+    return (
+      layer: result.features.isEmpty
+          ? null
+          : MapLayer(
+              id: _createLayerId(),
+              name: document.name,
+              sourcePath: document.path,
+              sourceType: MapLayerSourceType.dxf,
+              features: result.features,
+              properties: {
+                'lineCount': result.lineCount.toString(),
+                'pairCount': result.pairCount.toString(),
+                'sectionCount': result.sections.length.toString(),
+                'sections': result.sections.join(', '),
+                'pointCount': result.pointCount.toString(),
+                'lineEntityCount': result.lineCountEntity.toString(),
+                'polylineCount': result.polylineCount.toString(),
+                'polygonCount': result.polygonCount.toString(),
+              },
+            ),
+      diagnostics: result.diagnostics,
     );
   }
 

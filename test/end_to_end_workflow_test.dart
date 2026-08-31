@@ -1,11 +1,14 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:autocad_googleearth/models/cad_document.dart';
 import 'package:autocad_googleearth/models/coordinate_reference_system.dart';
 import 'package:autocad_googleearth/models/map_feature.dart';
 import 'package:autocad_googleearth/models/map_layer.dart';
 import 'package:autocad_googleearth/models/map_project.dart';
+import 'package:autocad_googleearth/screens/home_screen.dart';
 import 'package:autocad_googleearth/services/dxf_export_service.dart';
 import 'package:autocad_googleearth/services/dxf_parser_service.dart';
 import 'package:autocad_googleearth/services/kml_export_service.dart';
@@ -19,6 +22,64 @@ void main() {
     utmZone: 48,
     hemisphere: UtmHemisphere.north,
   );
+
+  Future<void> pumpCadImportHome(
+    WidgetTester tester,
+    String path, {
+    String fileName = 'fixture.dxf',
+  }) async {
+    tester.view.physicalSize = const Size(1600, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          initialProject: const MapProject(id: 'import', name: 'Import test'),
+          cadDocumentsSelectorOverride: () async => [
+            CadDocument(name: fileName, path: path, fileType: CadFileType.dxf),
+          ],
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  String projectTitle(WidgetTester tester) =>
+      tester.widget<Text>(find.byKey(const Key('project-title'))).data!;
+
+  Future<void> tapCadImport(WidgetTester tester) async {
+    await tester.tap(find.text('Thêm bản vẽ AutoCAD'));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    for (var attempt = 0; attempt < 50; attempt++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.text('Kết quả nhập DXF').evaluate().isNotEmpty ||
+          find.text('Kết quả nhập bản vẽ').evaluate().isNotEmpty) {
+        return;
+      }
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    throw TestFailure('DXF import did not present a result dialog.');
+  }
+
+  Future<String> writeWidgetDxf(
+    WidgetTester tester,
+    String fileName,
+    String content,
+  ) async {
+    final fixture = (await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp('geocad-e2e-');
+      final path = '${directory.path}${Platform.pathSeparator}$fileName';
+      await File(path).writeAsString(content);
+      return (directory: directory, path: path);
+    }))!;
+    addTearDown(() => fixture.directory.delete(recursive: true));
+    return fixture.path;
+  }
 
   test(
     'DXF local CAD -> georeference -> WGS84 -> KML preserves semantics',
@@ -266,4 +327,180 @@ EOF
       expect(layerProperties, {'source': 'survey'});
     },
   );
+
+  test(
+    'DXF diagnostics prevent non-finite values entering project model',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('geocad-e2e-');
+      addTearDown(() => directory.delete(recursive: true));
+      final path = '${directory.path}${Platform.pathSeparator}mixed.dxf';
+      await File(path).writeAsString('''0
+SECTION
+2
+ENTITIES
+0
+POINT
+8
+VALID
+10
+10
+20
+20
+0
+LINE
+8
+INVALID
+10
+0
+20
+0
+11
+Infinity
+21
+1
+0
+SPLINE
+8
+UNSUPPORTED
+0
+ENDSEC
+0
+EOF
+''');
+
+      final parsed = await const DxfParserService().parseFile(path);
+      final project = MapProject(
+        id: 'safe-import',
+        name: 'Safe import',
+        layers: [
+          MapLayer(
+            id: 'dxf',
+            name: 'Mixed',
+            sourceType: MapLayerSourceType.dxf,
+            sourcePath: path,
+            features: parsed.features,
+          ),
+        ],
+      );
+
+      expect(parsed.features, hasLength(1));
+      expect(parsed.diagnostics.totalEntityCount, 3);
+      expect(parsed.diagnostics.parsedEntityCount, 1);
+      expect(parsed.diagnostics.malformedEntityCount, 1);
+      expect(parsed.diagnostics.unsupportedEntityCounts, {'SPLINE': 1});
+      expect(
+        project.layers
+            .expand((layer) => layer.features)
+            .expand((feature) => feature.coordinates)
+            .every(
+              (coordinate) =>
+                  coordinate.x.isFinite &&
+                  coordinate.y.isFinite &&
+                  (coordinate.z?.isFinite ?? true),
+            ),
+        isTrue,
+      );
+    },
+  );
+
+  testWidgets('structural DXF failure does not mutate or dirty HomeScreen', (
+    tester,
+  ) async {
+    final path = await writeWidgetDxf(tester, 'broken.dxf', '0\nSECTION\n2');
+
+    await pumpCadImportHome(tester, path, fileName: 'broken.dxf');
+    expect(projectTitle(tester), isNot(endsWith(' *')));
+    await tapCadImport(tester);
+
+    expect(projectTitle(tester), isNot(endsWith(' *')));
+    expect(find.textContaining('Chưa có lớp dữ liệu'), findsOneWidget);
+    expect(find.byTooltip('Ẩn layer'), findsNothing);
+    expect(find.text('Kết quả nhập bản vẽ'), findsOneWidget);
+    await tester.tap(find.text('Đóng'));
+    await tester.pump(const Duration(milliseconds: 300));
+  });
+
+  testWidgets('zero valid DXF shows diagnostics without adding a layer', (
+    tester,
+  ) async {
+    final path = await writeWidgetDxf(tester, 'invalid-only.dxf', '''0
+SECTION
+2
+ENTITIES
+0
+POINT
+10
+NaN
+20
+1
+0
+SPLINE
+8
+UNSUPPORTED
+0
+ENDSEC
+0
+EOF
+''');
+
+    await pumpCadImportHome(tester, path, fileName: 'invalid-only.dxf');
+    await tapCadImport(tester);
+
+    expect(find.text('Kết quả nhập DXF'), findsOneWidget);
+    expect(find.text('Đã nhập: 0 entity'), findsOneWidget);
+    expect(find.text('Malformed đã bỏ qua: 1'), findsOneWidget);
+    expect(find.text('Entity chưa hỗ trợ: 1'), findsOneWidget);
+    expect(find.text('  • SPLINE: 1'), findsOneWidget);
+    expect(projectTitle(tester), isNot(endsWith(' *')));
+    expect(find.byTooltip('Ẩn layer'), findsNothing);
+
+    await tester.tap(find.text('Đóng'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(projectTitle(tester), isNot(endsWith(' *')));
+    expect(find.byTooltip('Ẩn layer'), findsNothing);
+  });
+
+  testWidgets('valid warned DXF adds once and dialog is read-only', (
+    tester,
+  ) async {
+    final path = await writeWidgetDxf(tester, 'warning.dxf', '''0
+SECTION
+2
+ENTITIES
+0
+LWPOLYLINE
+70
+0
+10
+0
+20
+0
+42
+0.5
+10
+10
+20
+0
+0
+ENDSEC
+0
+EOF
+''');
+
+    await pumpCadImportHome(tester, path, fileName: 'warning.dxf');
+    await tapCadImport(tester);
+
+    expect(find.text('Kết quả nhập DXF'), findsOneWidget);
+    expect(find.text('Đã nhập: 1 entity'), findsOneWidget);
+    expect(find.text('Malformed đã bỏ qua: 0'), findsOneWidget);
+    expect(find.text('Entity chưa hỗ trợ: 0'), findsOneWidget);
+    expect(find.text('Cảnh báo fidelity:'), findsOneWidget);
+    expect(projectTitle(tester), endsWith(' *'));
+    expect(find.byTooltip('Ẩn layer'), findsOneWidget);
+
+    await tester.tap(find.text('Đóng'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(projectTitle(tester), endsWith(' *'));
+    expect(find.byTooltip('Ẩn layer'), findsOneWidget);
+  });
 }

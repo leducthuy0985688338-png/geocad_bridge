@@ -33,6 +33,12 @@ class DxfParserService {
       throw const DxfParserException('File DXF không đúng cấu trúc.');
     }
 
+    if (lines.length.isOdd) {
+      throw const DxfParserException(
+        'File DXF có Group Code không đi kèm giá trị.',
+      );
+    }
+
     final pairs = _createPairs(lines);
 
     if (pairs.isEmpty) {
@@ -40,7 +46,8 @@ class DxfParserService {
     }
 
     final sections = _findSections(pairs);
-    final features = _parseEntities(pairs);
+    _validateEntitiesSection(pairs);
+    final entitiesResult = _parseEntities(pairs);
 
     return DxfParseResult(
       filePath: filePath,
@@ -48,7 +55,8 @@ class DxfParserService {
       pairCount: pairs.length,
       pairs: pairs,
       sections: sections,
-      features: features,
+      features: entitiesResult.features,
+      diagnostics: entitiesResult.diagnostics,
     );
   }
 
@@ -95,17 +103,46 @@ class DxfParserService {
     return sections;
   }
 
-  List<MapFeature> _parseEntities(List<DxfGroupPair> pairs) {
+  void _validateEntitiesSection(List<DxfGroupPair> pairs) {
+    var entitiesStart = -1;
+    for (var index = 0; index < pairs.length - 1; index++) {
+      if (pairs[index].code == 0 &&
+          pairs[index].value.toUpperCase() == 'SECTION' &&
+          pairs[index + 1].code == 2 &&
+          pairs[index + 1].value.toUpperCase() == 'ENTITIES') {
+        entitiesStart = index + 2;
+        break;
+      }
+    }
+    if (entitiesStart < 0) return;
+    for (var index = entitiesStart; index < pairs.length; index++) {
+      final pair = pairs[index];
+      if (pair.code != 0) continue;
+      final value = pair.value.toUpperCase();
+      if (value == 'ENDSEC') return;
+      if (value == 'SECTION' || value == 'EOF') break;
+    }
+    throw const DxfParserException('SECTION ENTITIES không có ENDSEC hợp lệ.');
+  }
+
+  _DxfEntitiesParseResult _parseEntities(List<DxfGroupPair> pairs) {
     final entityPairs = _getEntitiesSection(pairs);
 
     if (entityPairs.isEmpty) {
-      return const [];
+      return _DxfEntitiesParseResult(
+        features: const [],
+        diagnostics: const DxfImportDiagnostics.empty(),
+      );
     }
 
     final features = <MapFeature>[];
+    final issues = <DxfImportDiagnostic>[];
+    final unsupportedCounts = <String, int>{};
 
     var index = 0;
     var featureIndex = 0;
+    var entityIndex = 0;
+    var malformedCount = 0;
 
     while (index < entityPairs.length) {
       final pair = entityPairs[index];
@@ -116,12 +153,41 @@ class DxfParserService {
       }
 
       final entityType = pair.value.toUpperCase();
+      entityIndex++;
 
       final nextEntityIndex = _findNextEntityIndex(entityPairs, index + 1);
 
       final entityData = entityPairs.sublist(index + 1, nextEntityIndex);
 
       MapFeature? feature;
+
+      if (!_supportedEntityTypes.contains(entityType)) {
+        unsupportedCounts.update(
+          entityType,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+        issues.add(
+          DxfImportDiagnostic(
+            code: DxfDiagnosticCode.unsupportedEntity,
+            severity: DxfDiagnosticSeverity.warning,
+            entityType: entityType,
+            entityIndex: entityIndex,
+            layerName: _readString(entityData, 8),
+            reason: 'Entity $entityType chưa được hỗ trợ.',
+          ),
+        );
+        index = nextEntityIndex;
+        continue;
+      }
+
+      final validation = _validateEntity(entityType, entityData, entityIndex);
+      issues.addAll(validation.issues);
+      if (!validation.isValid) {
+        malformedCount++;
+        index = nextEntityIndex;
+        continue;
+      }
 
       switch (entityType) {
         case 'POINT':
@@ -153,15 +219,422 @@ class DxfParserService {
           break;
       }
 
-      if (feature != null) {
-        features.add(feature);
-        featureIndex++;
+      if (feature == null ||
+          feature.coordinates.any(
+            (coordinate) =>
+                !coordinate.x.isFinite ||
+                !coordinate.y.isFinite ||
+                (coordinate.z != null && !coordinate.z!.isFinite),
+          )) {
+        malformedCount++;
+        issues.add(
+          DxfImportDiagnostic(
+            code: feature == null
+                ? DxfDiagnosticCode.malformedEntity
+                : DxfDiagnosticCode.nonFiniteNumber,
+            severity: DxfDiagnosticSeverity.error,
+            entityType: entityType,
+            entityIndex: entityIndex,
+            layerName: _readString(entityData, 8),
+            reason: feature == null
+                ? 'Không thể tạo geometry $entityType hợp lệ.'
+                : 'Geometry $entityType tạo ra tọa độ không hữu hạn.',
+          ),
+        );
+        index = nextEntityIndex;
+        continue;
       }
+
+      features.add(feature);
+      featureIndex++;
 
       index = nextEntityIndex;
     }
 
-    return features;
+    final sortedUnsupported = Map<String, int>.fromEntries(
+      unsupportedCounts.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key)),
+    );
+    return _DxfEntitiesParseResult(
+      features: features,
+      diagnostics: DxfImportDiagnostics(
+        totalEntityCount: entityIndex,
+        parsedEntityCount: features.length,
+        malformedEntityCount: malformedCount,
+        unsupportedEntityCounts: sortedUnsupported,
+        issues: issues,
+      ),
+    );
+  }
+
+  static const _supportedEntityTypes = <String>{
+    'POINT',
+    'LINE',
+    'LWPOLYLINE',
+    'CIRCLE',
+    'ARC',
+    'TEXT',
+    'MTEXT',
+  };
+
+  _DxfEntityValidation _validateEntity(
+    String entityType,
+    List<DxfGroupPair> data,
+    int entityIndex,
+  ) {
+    final issues = <DxfImportDiagnostic>[];
+    final layerName = _readString(data, 8);
+
+    void malformed(DxfDiagnosticCode code, String reason, {int? groupCode}) {
+      if (issues.any(
+        (issue) => issue.severity == DxfDiagnosticSeverity.error,
+      )) {
+        return;
+      }
+      issues.add(
+        DxfImportDiagnostic(
+          code: code,
+          severity: DxfDiagnosticSeverity.error,
+          entityType: entityType,
+          entityIndex: entityIndex,
+          layerName: layerName,
+          groupCode: groupCode,
+          reason: reason,
+        ),
+      );
+    }
+
+    void warning(DxfDiagnosticCode code, String reason, {int? groupCode}) {
+      issues.add(
+        DxfImportDiagnostic(
+          code: code,
+          severity: DxfDiagnosticSeverity.warning,
+          entityType: entityType,
+          entityIndex: entityIndex,
+          layerName: layerName,
+          groupCode: groupCode,
+          reason: reason,
+        ),
+      );
+    }
+
+    bool validateNumber(
+      int code, {
+      required bool required,
+      bool positive = false,
+    }) {
+      final values = data.where((pair) => pair.code == code).toList();
+      if (values.isEmpty) {
+        if (required) {
+          malformed(
+            DxfDiagnosticCode.missingRequiredValue,
+            'Thiếu Group Code $code bắt buộc của $entityType.',
+            groupCode: code,
+          );
+        }
+        return !required;
+      }
+      for (final pair in values) {
+        final value = double.tryParse(pair.value);
+        if (value == null) {
+          malformed(
+            DxfDiagnosticCode.invalidNumber,
+            'Group Code $code của $entityType không phải số hợp lệ.',
+            groupCode: code,
+          );
+          return false;
+        }
+        if (!value.isFinite) {
+          malformed(
+            DxfDiagnosticCode.nonFiniteNumber,
+            'Group Code $code của $entityType phải là số hữu hạn.',
+            groupCode: code,
+          );
+          return false;
+        }
+        if (positive && value <= 0) {
+          malformed(
+            DxfDiagnosticCode.invalidGeometry,
+            'Group Code $code của $entityType phải lớn hơn 0.',
+            groupCode: code,
+          );
+          return false;
+        }
+      }
+      return true;
+    }
+
+    switch (entityType) {
+      case 'POINT':
+        validateNumber(10, required: true);
+        validateNumber(20, required: true);
+        validateNumber(30, required: false);
+      case 'LINE':
+        for (final code in const [10, 20, 11, 21]) {
+          validateNumber(code, required: true);
+        }
+        validateNumber(30, required: false);
+        validateNumber(31, required: false);
+      case 'LWPOLYLINE':
+        _validateLwPolyline(data, malformed: malformed, warning: warning);
+      case 'CIRCLE':
+        validateNumber(10, required: true);
+        validateNumber(20, required: true);
+        validateNumber(30, required: false);
+        validateNumber(40, required: true, positive: true);
+      case 'ARC':
+        validateNumber(10, required: true);
+        validateNumber(20, required: true);
+        validateNumber(30, required: false);
+        validateNumber(40, required: true, positive: true);
+        final startValid = validateNumber(50, required: true);
+        final endValid = validateNumber(51, required: true);
+        if (startValid && endValid) {
+          final start = _readDouble(data, 50)!;
+          final end = _readDouble(data, 51)!;
+          if (_normalizeArcSweep(start, end) == null) {
+            malformed(
+              DxfDiagnosticCode.invalidGeometry,
+              'ARC có góc quét không hợp lệ hoặc bằng 0.',
+            );
+          }
+        }
+      case 'TEXT':
+        validateNumber(10, required: true);
+        validateNumber(20, required: true);
+        validateNumber(30, required: false);
+        validateNumber(40, required: false, positive: true);
+        validateNumber(50, required: false);
+        final content = _readString(data, 1)?.trim();
+        if (content == null || content.isEmpty) {
+          malformed(
+            DxfDiagnosticCode.missingRequiredValue,
+            'TEXT thiếu nội dung Group Code 1 hợp lệ.',
+            groupCode: 1,
+          );
+        }
+      case 'MTEXT':
+        validateNumber(10, required: true);
+        validateNumber(20, required: true);
+        validateNumber(30, required: false);
+        validateNumber(40, required: false, positive: true);
+        validateNumber(50, required: false);
+        final chunks = _readStrings(data, 3);
+        final finalChunk = _readString(data, 1);
+        if (finalChunk != null) chunks.add(finalChunk);
+        if (_cleanMText(chunks.join()).trim().isEmpty) {
+          malformed(
+            DxfDiagnosticCode.missingRequiredValue,
+            'MTEXT thiếu nội dung Group Code 1/3 hợp lệ.',
+          );
+        }
+    }
+
+    return _DxfEntityValidation(issues);
+  }
+
+  void _validateLwPolyline(
+    List<DxfGroupPair> data, {
+    required void Function(
+      DxfDiagnosticCode code,
+      String reason, {
+      int? groupCode,
+    })
+    malformed,
+    required void Function(
+      DxfDiagnosticCode code,
+      String reason, {
+      int? groupCode,
+    })
+    warning,
+  }) {
+    var pendingX = false;
+    var vertexCount = 0;
+    for (final pair in data) {
+      if (pair.code == 10) {
+        if (pendingX) {
+          malformed(
+            DxfDiagnosticCode.invalidGeometry,
+            'LWPOLYLINE có đỉnh X không đi kèm Y.',
+            groupCode: 10,
+          );
+          return;
+        }
+        final x = double.tryParse(pair.value);
+        if (x == null || !x.isFinite) {
+          malformed(
+            x == null
+                ? DxfDiagnosticCode.invalidNumber
+                : DxfDiagnosticCode.nonFiniteNumber,
+            'Tọa độ X của LWPOLYLINE không hợp lệ hoặc không hữu hạn.',
+            groupCode: 10,
+          );
+          return;
+        }
+        pendingX = true;
+      } else if (pair.code == 20) {
+        if (!pendingX) {
+          malformed(
+            DxfDiagnosticCode.invalidGeometry,
+            'LWPOLYLINE có đỉnh Y không đi kèm X.',
+            groupCode: 20,
+          );
+          return;
+        }
+        final y = double.tryParse(pair.value);
+        if (y == null || !y.isFinite) {
+          malformed(
+            y == null
+                ? DxfDiagnosticCode.invalidNumber
+                : DxfDiagnosticCode.nonFiniteNumber,
+            'Tọa độ Y của LWPOLYLINE không hợp lệ hoặc không hữu hạn.',
+            groupCode: 20,
+          );
+          return;
+        }
+        pendingX = false;
+        vertexCount++;
+      }
+    }
+    if (pendingX) {
+      malformed(
+        DxfDiagnosticCode.invalidGeometry,
+        'LWPOLYLINE có đỉnh X cuối không đi kèm Y.',
+        groupCode: 10,
+      );
+      return;
+    }
+
+    final flagsText = _readString(data, 70);
+    final flags = flagsText == null ? 0 : int.tryParse(flagsText);
+    if (flags == null) {
+      malformed(
+        DxfDiagnosticCode.invalidNumber,
+        'Flags Group Code 70 của LWPOLYLINE không hợp lệ.',
+        groupCode: 70,
+      );
+      return;
+    }
+    final isClosed = (flags & 1) == 1;
+    final minimum = isClosed ? 3 : 2;
+    if (vertexCount < minimum) {
+      malformed(
+        DxfDiagnosticCode.invalidGeometry,
+        'LWPOLYLINE ${isClosed ? 'đóng' : 'mở'} cần ít nhất $minimum đỉnh.',
+      );
+      return;
+    }
+
+    final declaredText = _readString(data, 90);
+    if (declaredText == null) {
+      warning(
+        DxfDiagnosticCode.lwPolylineVertexCountMissing,
+        'LWPOLYLINE thiếu khai báo số đỉnh Group Code 90.',
+        groupCode: 90,
+      );
+    } else {
+      final declared = int.tryParse(declaredText);
+      if (declared == null || declared < 0) {
+        malformed(
+          DxfDiagnosticCode.invalidNumber,
+          'Số đỉnh Group Code 90 của LWPOLYLINE không hợp lệ.',
+          groupCode: 90,
+        );
+        return;
+      }
+      if (declared != vertexCount) {
+        malformed(
+          DxfDiagnosticCode.lwPolylineVertexCountMismatch,
+          'LWPOLYLINE khai báo $declared đỉnh nhưng đọc được $vertexCount.',
+          groupCode: 90,
+        );
+        return;
+      }
+    }
+
+    final bulges = data.where((pair) => pair.code == 42).toList();
+    var hasNonZeroBulge = false;
+    for (final pair in bulges) {
+      final value = double.tryParse(pair.value);
+      if (value == null || !value.isFinite) {
+        malformed(
+          value == null
+              ? DxfDiagnosticCode.invalidNumber
+              : DxfDiagnosticCode.nonFiniteNumber,
+          'Bulge Group Code 42 của LWPOLYLINE không hợp lệ.',
+          groupCode: 42,
+        );
+        return;
+      }
+      hasNonZeroBulge |= value != 0;
+    }
+    if (hasNonZeroBulge) {
+      warning(
+        DxfDiagnosticCode.lwPolylineBulgeNotPreserved,
+        'LWPOLYLINE có bulge; cung được nhập dưới dạng đoạn thẳng.',
+        groupCode: 42,
+      );
+    }
+
+    final elevations = data.where((pair) => pair.code == 38).toList();
+    for (final pair in elevations) {
+      final value = double.tryParse(pair.value);
+      if (value == null || !value.isFinite) {
+        malformed(
+          value == null
+              ? DxfDiagnosticCode.invalidNumber
+              : DxfDiagnosticCode.nonFiniteNumber,
+          'Elevation Group Code 38 của LWPOLYLINE không hợp lệ.',
+          groupCode: 38,
+        );
+        return;
+      }
+    }
+    if (elevations.isNotEmpty) {
+      warning(
+        DxfDiagnosticCode.lwPolylineElevationNotPreserved,
+        'Elevation của LWPOLYLINE chưa được bảo toàn.',
+        groupCode: 38,
+      );
+    }
+
+    final hasOcs = data.any(
+      (pair) => pair.code == 210 || pair.code == 220 || pair.code == 230,
+    );
+    if (!hasOcs) return;
+    final ocsValues = <double>[];
+    for (final code in const [210, 220, 230]) {
+      final text = _readString(data, code);
+      final value = text == null ? null : double.tryParse(text);
+      if (value == null || !value.isFinite) {
+        malformed(
+          value != null
+              ? DxfDiagnosticCode.nonFiniteNumber
+              : DxfDiagnosticCode.lwPolylineOcsNotSupported,
+          'OCS của LWPOLYLINE phải có đủ 210/220/230 hữu hạn.',
+          groupCode: code,
+        );
+        return;
+      }
+      ocsValues.add(value);
+    }
+    const tolerance = 1e-12;
+    final isDefault =
+        ocsValues[0].abs() <= tolerance &&
+        ocsValues[1].abs() <= tolerance &&
+        (ocsValues[2] - 1).abs() <= tolerance;
+    if (!isDefault) {
+      malformed(
+        DxfDiagnosticCode.lwPolylineOcsNotSupported,
+        'LWPOLYLINE dùng OCS phi mặc định chưa được hỗ trợ.',
+      );
+      return;
+    }
+    warning(
+      DxfDiagnosticCode.lwPolylineDefaultOcs,
+      'LWPOLYLINE khai báo OCS mặc định (0,0,1).',
+      groupCode: 210,
+    );
   }
 
   List<DxfGroupPair> _getEntitiesSection(List<DxfGroupPair> pairs) {
@@ -377,14 +850,14 @@ class DxfParserService {
       return null;
     }
 
-    var sweepAngle = endAngle - startAngle;
-    while (sweepAngle < 0) {
-      sweepAngle += 360;
-    }
+    final normalizedArc = _normalizeArcSweep(startAngle, endAngle);
+    if (normalizedArc == null) return null;
 
+    final sweepAngle = normalizedArc.sweepDegrees;
     final segmentCount = math.max(1, (sweepAngle / 5).ceil());
     final coordinates = List.generate(segmentCount + 1, (index) {
-      final angleDegrees = startAngle + sweepAngle * index / segmentCount;
+      final angleDegrees =
+          normalizedArc.startDegrees + sweepAngle * index / segmentCount;
       final angleRadians = angleDegrees * math.pi / 180;
 
       return MapCoordinate(
@@ -414,6 +887,21 @@ class DxfParserService {
         'approximationSegments': segmentCount.toString(),
       },
     );
+  }
+
+  _DxfArcSweep? _normalizeArcSweep(double startAngle, double endAngle) {
+    if (!startAngle.isFinite || !endAngle.isFinite) return null;
+    final normalizedStart = _normalizeDegrees(startAngle);
+    final normalizedEnd = _normalizeDegrees(endAngle);
+    var sweep = normalizedEnd - normalizedStart;
+    if (sweep < 0) sweep += 360;
+    if (!sweep.isFinite || sweep <= 1e-12 || sweep > 360) return null;
+    return _DxfArcSweep(startDegrees: normalizedStart, sweepDegrees: sweep);
+  }
+
+  double _normalizeDegrees(double angle) {
+    final normalized = angle % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
   }
 
   MapFeature? _parseText(List<DxfGroupPair> data, int featureIndex) {
@@ -543,6 +1031,115 @@ class DxfGroupPair {
   }
 }
 
+enum DxfDiagnosticSeverity { warning, error }
+
+enum DxfDiagnosticCode {
+  malformedEntity,
+  unsupportedEntity,
+  nonFiniteNumber,
+  invalidNumber,
+  missingRequiredValue,
+  invalidGeometry,
+  lwPolylineBulgeNotPreserved,
+  lwPolylineElevationNotPreserved,
+  lwPolylineOcsNotSupported,
+  lwPolylineDefaultOcs,
+  lwPolylineVertexCountMissing,
+  lwPolylineVertexCountMismatch,
+}
+
+class DxfImportDiagnostic {
+  final DxfDiagnosticCode code;
+  final DxfDiagnosticSeverity severity;
+  final String entityType;
+  final int entityIndex;
+  final String? layerName;
+  final int? groupCode;
+  final String reason;
+
+  const DxfImportDiagnostic({
+    required this.code,
+    required this.severity,
+    required this.entityType,
+    required this.entityIndex,
+    required this.reason,
+    this.layerName,
+    this.groupCode,
+  });
+}
+
+class DxfImportDiagnostics {
+  final int totalEntityCount;
+  final int parsedEntityCount;
+  final int malformedEntityCount;
+  final Map<String, int> unsupportedEntityCounts;
+  final List<DxfImportDiagnostic> issues;
+
+  const DxfImportDiagnostics.empty()
+    : totalEntityCount = 0,
+      parsedEntityCount = 0,
+      malformedEntityCount = 0,
+      unsupportedEntityCounts = const {},
+      issues = const [];
+
+  DxfImportDiagnostics({
+    required this.totalEntityCount,
+    required this.parsedEntityCount,
+    required this.malformedEntityCount,
+    required Map<String, int> unsupportedEntityCounts,
+    required List<DxfImportDiagnostic> issues,
+  }) : unsupportedEntityCounts = Map.unmodifiable(unsupportedEntityCounts),
+       issues = List.unmodifiable(issues) {
+    if (totalEntityCount !=
+        parsedEntityCount + malformedEntityCount + unsupportedEntityCount) {
+      throw ArgumentError('DXF diagnostics counts are inconsistent.');
+    }
+  }
+
+  int get unsupportedEntityCount =>
+      unsupportedEntityCounts.values.fold(0, (total, count) => total + count);
+
+  int get skippedEntityCount => malformedEntityCount + unsupportedEntityCount;
+
+  bool get hasIssues => issues.isNotEmpty;
+
+  bool get hasFidelityWarnings => issues.any(
+    (issue) => const {
+      DxfDiagnosticCode.lwPolylineBulgeNotPreserved,
+      DxfDiagnosticCode.lwPolylineElevationNotPreserved,
+      DxfDiagnosticCode.lwPolylineDefaultOcs,
+      DxfDiagnosticCode.lwPolylineVertexCountMissing,
+    }.contains(issue.code),
+  );
+}
+
+class _DxfEntityValidation {
+  final List<DxfImportDiagnostic> issues;
+
+  _DxfEntityValidation(List<DxfImportDiagnostic> issues)
+    : issues = List.unmodifiable(issues);
+
+  bool get isValid =>
+      !issues.any((issue) => issue.severity == DxfDiagnosticSeverity.error);
+}
+
+class _DxfArcSweep {
+  final double startDegrees;
+  final double sweepDegrees;
+
+  const _DxfArcSweep({required this.startDegrees, required this.sweepDegrees});
+}
+
+class _DxfEntitiesParseResult {
+  final List<MapFeature> features;
+  final DxfImportDiagnostics diagnostics;
+
+  _DxfEntitiesParseResult({
+    required List<MapFeature> features,
+    required this.diagnostics,
+  }) : features = List.unmodifiable(features);
+}
+
 class DxfParseResult {
   final String filePath;
   final int lineCount;
@@ -554,6 +1151,8 @@ class DxfParseResult {
   /// Các đối tượng hình học DXF đã đọc thành công.
   final List<MapFeature> features;
 
+  final DxfImportDiagnostics diagnostics;
+
   const DxfParseResult({
     required this.filePath,
     required this.lineCount,
@@ -561,6 +1160,7 @@ class DxfParseResult {
     required this.pairs,
     required this.sections,
     required this.features,
+    this.diagnostics = const DxfImportDiagnostics.empty(),
   });
 
   bool get hasHeader => sections.contains('HEADER');
