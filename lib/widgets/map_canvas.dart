@@ -6,18 +6,26 @@ import 'package:flutter/material.dart';
 import '../models/map_feature.dart';
 import '../models/map_feature_change.dart';
 import '../models/map_project.dart';
+import '../services/drawing_controller.dart';
 import '../services/feature_style_resolver.dart';
 import '../services/map_selection_service.dart';
 import '../services/map_snap_service.dart';
 import 'cad_grid_painter.dart';
+import 'drawing_painter.dart';
 import 'selection_painter.dart';
 import 'snap_painter.dart';
 
 class MapCanvas extends StatefulWidget {
   final MapProject project;
   final ValueChanged<MapFeatureChange>? onFeatureChanged;
+  final ValueChanged<MapFeature>? onFeatureCreated;
 
-  const MapCanvas({super.key, required this.project, this.onFeatureChanged});
+  const MapCanvas({
+    super.key,
+    required this.project,
+    this.onFeatureChanged,
+    this.onFeatureCreated,
+  });
 
   @override
   State<MapCanvas> createState() => _MapCanvasState();
@@ -27,6 +35,7 @@ class _MapCanvasState extends State<MapCanvas> {
   final MapSelectionService _selectionService = const MapSelectionService();
 
   final MapSnapService _snapService = const MapSnapService();
+  final DrawingController _drawingController = DrawingController();
 
   double _zoom = 1.0;
   Offset _pan = Offset.zero;
@@ -55,6 +64,14 @@ class _MapCanvasState extends State<MapCanvas> {
   static const double _selectionTolerancePixels = 10.0;
   static const double _snapTolerancePixels = 12.0;
   static const double _clickMovementTolerance = 4.0;
+  static const _fallbackBounds = _MapBounds(
+    minX: -100,
+    minY: -100,
+    maxX: 100,
+    maxY: 100,
+  );
+
+  int _featureIdSequence = 0;
 
   List<MapFeature> get _projectFeatures {
     return widget.project.visibleFeatures;
@@ -205,6 +222,11 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   void _handlePointerDown(PointerDownEvent event, Size canvasSize) {
+    if (_drawingController.isDrawing && event.buttons == kPrimaryMouseButton) {
+      _addDrawingCoordinate(event.localPosition, canvasSize);
+      return;
+    }
+
     if (event.buttons == kPrimaryMouseButton) {
       if (_tryStartVertexEdit(event.localPosition, canvasSize)) {
         return;
@@ -327,6 +349,11 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   void _handlePointerMove(PointerMoveEvent event, Size canvasSize) {
+    if (_drawingController.isDrawing) {
+      _updateDrawingHover(event.localPosition, canvasSize);
+      return;
+    }
+
     if (_isMovingFeature) {
       _updateFeatureMove(event.localPosition, canvasSize);
       return;
@@ -477,6 +504,10 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   void _handlePointerUp(PointerUpEvent event, Size canvasSize) {
+    if (_drawingController.isDrawing) {
+      return;
+    }
+
     if (_isMovingFeature) {
       _finishFeatureMove(event.localPosition, canvasSize);
       return;
@@ -655,6 +686,96 @@ class _MapCanvasState extends State<MapCanvas> {
     setState(() {
       _mouseCoordinate = coordinate;
       _snapResult = snap;
+    });
+  }
+
+  _MapTransform _drawingTransform(Size canvasSize) {
+    return _MapTransform.create(
+      bounds: _calculateBounds(_displayFeatures) ?? _fallbackBounds,
+      canvasSize: canvasSize,
+    );
+  }
+
+  ({MapCoordinate coordinate, MapSnapResult? snap}) _drawingCoordinateAt(
+    Offset localPosition,
+    Size canvasSize,
+  ) {
+    final transform = _drawingTransform(canvasSize);
+    final coordinate = transform.fromCanvas(
+      localPosition,
+      zoom: _zoom,
+      pan: _pan,
+    );
+    final effectiveScale = transform.scale * _zoom;
+    final snap = effectiveScale <= 0
+        ? null
+        : _snapService.findNearestSnap(
+            features: _displayFeatures,
+            position: coordinate,
+            tolerance: _snapTolerancePixels / effectiveScale,
+          );
+
+    return (coordinate: snap?.coordinate ?? coordinate, snap: snap);
+  }
+
+  void _addDrawingCoordinate(Offset localPosition, Size canvasSize) {
+    final result = _drawingCoordinateAt(localPosition, canvasSize);
+
+    setState(() {
+      _drawingController.addCoordinate(result.coordinate);
+      _drawingController.updateHoverCoordinate(result.coordinate);
+      _mouseCoordinate = result.coordinate;
+      _snapResult = result.snap;
+    });
+
+    if (_drawingController.mode == DrawingMode.point &&
+        _drawingController.canFinish) {
+      _finishDrawing();
+    }
+  }
+
+  void _updateDrawingHover(Offset localPosition, Size canvasSize) {
+    final result = _drawingCoordinateAt(localPosition, canvasSize);
+
+    setState(() {
+      _drawingController.updateHoverCoordinate(result.coordinate);
+      _mouseCoordinate = result.coordinate;
+      _snapResult = result.snap;
+    });
+  }
+
+  void _startDrawing(DrawingMode mode) {
+    setState(() {
+      _drawingController.start(mode);
+      _selectedFeature = null;
+      _previewFeature = null;
+      _snapResult = null;
+      _isPanning = false;
+      _isEditingVertex = false;
+      _isMovingFeature = false;
+    });
+  }
+
+  void _finishDrawing() {
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final feature = _drawingController.finish(
+      id: 'manual-feature-$now-${_featureIdSequence++}',
+    );
+
+    if (feature == null) {
+      return;
+    }
+
+    setState(() {
+      _snapResult = null;
+    });
+    widget.onFeatureCreated?.call(feature);
+  }
+
+  void _cancelDrawing() {
+    setState(() {
+      _drawingController.cancel();
+      _snapResult = null;
     });
   }
 
@@ -1161,6 +1282,7 @@ class _MapCanvasState extends State<MapCanvas> {
     setState(() {
       _mouseCoordinate = null;
       _snapResult = null;
+      _drawingController.updateHoverCoordinate(null);
     });
   }
 
@@ -1191,19 +1313,11 @@ class _MapCanvasState extends State<MapCanvas> {
 
   @override
   Widget build(BuildContext context) {
-    if (_displayFeatures.isEmpty) {
-      return const _EmptyMapCanvas();
-    }
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
 
-        final bounds = _calculateBounds(_displayFeatures);
-
-        if (bounds == null) {
-          return const _EmptyMapCanvas();
-        }
+        final bounds = _calculateBounds(_displayFeatures) ?? _fallbackBounds;
 
         final transform = _MapTransform.create(
           bounds: bounds,
@@ -1224,7 +1338,11 @@ class _MapCanvasState extends State<MapCanvas> {
                     ? SystemMouseCursors.precise
                     : SystemMouseCursors.grab,
                 onHover: (event) {
-                  _updatePointerState(event.localPosition, canvasSize);
+                  if (_drawingController.isDrawing) {
+                    _updateDrawingHover(event.localPosition, canvasSize);
+                  } else {
+                    _updatePointerState(event.localPosition, canvasSize);
+                  }
                 },
                 onExit: (_) {
                   _clearPointerState();
@@ -1303,9 +1421,41 @@ class _MapCanvasState extends State<MapCanvas> {
                           ),
                         ),
                       ),
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: DrawingPainter(
+                              mode: _drawingController.mode,
+                              coordinates: _drawingController.coordinates,
+                              hoverCoordinate:
+                                  _drawingController.hoverCoordinate,
+                              toScreen: (coordinate) {
+                                return transform.toScreen(
+                                  coordinate,
+                                  zoom: _zoom,
+                                  pan: _pan,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              left: 12,
+              child: _DrawingToolbar(
+                mode: _drawingController.mode,
+                canFinish: _drawingController.canFinish,
+                onPoint: () => _startDrawing(DrawingMode.point),
+                onPolyline: () => _startDrawing(DrawingMode.polyline),
+                onPolygon: () => _startDrawing(DrawingMode.polygon),
+                onFinish: _finishDrawing,
+                onCancel: _cancelDrawing,
               ),
             ),
             Positioned(
@@ -1319,7 +1469,8 @@ class _MapCanvasState extends State<MapCanvas> {
                 onFit: _fitView,
               ),
             ),
-            if (_displaySelectedFeature != null)
+            if (!_drawingController.isDrawing &&
+                _displaySelectedFeature != null)
               Positioned(
                 top: 70,
                 right: 12,
@@ -1330,7 +1481,8 @@ class _MapCanvasState extends State<MapCanvas> {
                   moving: _isMovingFeature,
                 ),
               ),
-            if (_displaySelectedFeature != null)
+            if (!_drawingController.isDrawing &&
+                _displaySelectedFeature != null)
               Positioned(
                 top: 258,
                 right: 12,
@@ -1364,6 +1516,76 @@ class _MapCanvasState extends State<MapCanvas> {
           ],
         );
       },
+    );
+  }
+}
+
+class _DrawingToolbar extends StatelessWidget {
+  final DrawingMode mode;
+  final bool canFinish;
+  final VoidCallback onPoint;
+  final VoidCallback onPolyline;
+  final VoidCallback onPolygon;
+  final VoidCallback onFinish;
+  final VoidCallback onCancel;
+
+  const _DrawingToolbar({
+    required this.mode,
+    required this.canFinish,
+    required this.onPoint,
+    required this.onPolyline,
+    required this.onPolygon,
+    required this.onFinish,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final drawing = mode != DrawingMode.none;
+
+    return Material(
+      elevation: 3,
+      borderRadius: BorderRadius.circular(8),
+      color: Colors.white,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: const Key('draw-point'),
+            tooltip: 'Point',
+            onPressed: onPoint,
+            color: mode == DrawingMode.point ? Colors.blue : null,
+            icon: const Icon(Icons.fiber_manual_record),
+          ),
+          IconButton(
+            key: const Key('draw-polyline'),
+            tooltip: 'Polyline',
+            onPressed: onPolyline,
+            color: mode == DrawingMode.polyline ? Colors.blue : null,
+            icon: const Icon(Icons.timeline),
+          ),
+          IconButton(
+            key: const Key('draw-polygon'),
+            tooltip: 'Polygon',
+            onPressed: onPolygon,
+            color: mode == DrawingMode.polygon ? Colors.blue : null,
+            icon: const Icon(Icons.change_history),
+          ),
+          Container(width: 1, height: 28, color: const Color(0xFFE0E0E0)),
+          IconButton(
+            key: const Key('draw-finish'),
+            tooltip: 'Finish',
+            onPressed: drawing && canFinish ? onFinish : null,
+            icon: const Icon(Icons.check),
+          ),
+          IconButton(
+            key: const Key('draw-cancel'),
+            tooltip: 'Cancel',
+            onPressed: drawing ? onCancel : null,
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1728,35 +1950,6 @@ class _CoordinateIndicator extends StatelessWidget {
     }
 
     return value.toStringAsFixed(4);
-  }
-}
-
-class _EmptyMapCanvas extends StatelessWidget {
-  const _EmptyMapCanvas();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.layers_clear, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'Chưa có hình học để hiển thị',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            SizedBox(height: 6),
-            Text(
-              'Hãy mở một file DXF có dữ liệu hình học.',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

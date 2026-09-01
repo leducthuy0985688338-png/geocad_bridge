@@ -8,6 +8,7 @@ import 'package:file_selector/file_selector.dart' as file_selector;
 
 import '../models/cad_document.dart';
 import '../models/coordinate_reference_system.dart';
+import '../models/map_feature.dart';
 import '../models/map_feature_change.dart';
 import '../models/map_layer.dart';
 import '../models/map_project.dart';
@@ -821,6 +822,38 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _applyFeatureCreation(MapFeature feature) {
+    if (_isProjectBusy) return;
+
+    MapLayer? drawingLayer;
+    for (final layer in _project.layers) {
+      if (layer.sourceType == MapLayerSourceType.manual &&
+          layer.name == 'Manual Drawing' &&
+          layer.sourcePath == null &&
+          !layer.locked) {
+        drawingLayer = layer;
+        break;
+      }
+    }
+
+    _recordHistory();
+
+    setState(() {
+      if (drawingLayer == null) {
+        final layer = MapLayer(
+          id: _createLayerId(),
+          name: 'Manual Drawing',
+          sourceType: MapLayerSourceType.manual,
+          sourcePath: null,
+          features: [feature],
+        );
+        _project = _project.addLayer(layer);
+      } else {
+        _project = _project.updateLayer(drawingLayer.addFeature(feature));
+      }
+    });
+  }
+
   void _removeLayer(String layerId) {
     if (_isProjectBusy) return;
     _recordHistory();
@@ -1431,6 +1464,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       project: _project,
                       isImporting: _isImporting,
                       onFeatureChanged: _applyFeatureChange,
+                      onFeatureCreated: _applyFeatureCreation,
                     ),
                   ),
                 ],
@@ -2224,11 +2258,13 @@ class _Workspace extends StatelessWidget {
   final MapProject project;
   final bool isImporting;
   final ValueChanged<MapFeatureChange> onFeatureChanged;
+  final ValueChanged<MapFeature> onFeatureCreated;
 
   const _Workspace({
     required this.project,
     required this.isImporting,
     required this.onFeatureChanged,
+    required this.onFeatureCreated,
   });
 
   @override
@@ -2249,7 +2285,18 @@ class _Workspace extends StatelessWidget {
     }
 
     if (project.layers.isEmpty) {
-      return const _EmptyWorkspace();
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: MapCanvas(
+              project: project,
+              onFeatureChanged: onFeatureChanged,
+              onFeatureCreated: onFeatureCreated,
+            ),
+          ),
+          const Positioned.fill(child: IgnorePointer(child: _EmptyWorkspace())),
+        ],
+      );
     }
 
     return Column(
@@ -2270,6 +2317,7 @@ class _Workspace extends StatelessWidget {
                 child: MapCanvas(
                   project: project,
                   onFeatureChanged: onFeatureChanged,
+                  onFeatureCreated: onFeatureCreated,
                 ),
               ),
             ),
@@ -2418,30 +2466,26 @@ class _EmptyWorkspace extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(32),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.satellite_alt, size: 90, color: Colors.blue.shade700),
-            const SizedBox(height: 24),
-            const Text(
-              'AutoCAD ↔ Google Earth',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              l10n.welcomeTagline,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 32),
-            Text(l10n.welcomeAddData, textAlign: TextAlign.center),
-          ],
-        ),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.satellite_alt, size: 90, color: Colors.blue.shade700),
+          const SizedBox(height: 24),
+          const Text(
+            'AutoCAD ↔ Google Earth',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            l10n.welcomeTagline,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+          const SizedBox(height: 32),
+          Text(l10n.welcomeAddData, textAlign: TextAlign.center),
+        ],
       ),
     );
   }
