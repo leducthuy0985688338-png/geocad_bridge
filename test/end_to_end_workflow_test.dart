@@ -170,6 +170,102 @@ EOF
   );
 
   test(
+    'DXF BYLAYER canonical color survives georeference and persistence',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'geocad-bylayer-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final path = '${directory.path}${Platform.pathSeparator}bylayer.dxf';
+      await File(path).writeAsString('''0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LAYER
+70
+1
+0
+LAYER
+2
+ROADS
+70
+4
+62
+3
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+LINE
+8
+ROADS
+62
+256
+10
+0
+20
+0
+11
+100
+21
+0
+0
+ENDSEC
+0
+EOF
+''');
+
+      final parsed = await const DxfParserService().parseFile(path);
+      final imported = MapLayer(
+        id: 'bylayer',
+        name: 'bylayer.dxf',
+        sourceType: MapLayerSourceType.dxf,
+        sourcePath: path,
+        features: parsed.features,
+      );
+      final georeferenced = const LayerGeoreferenceService().georeferenceLayer(
+        sourceLayer: imported,
+        point1: const GeoreferenceControlPoint(
+          local: MapCoordinate(x: 0, y: 0),
+          target: MapCoordinate(x: 500000, y: 1800000),
+        ),
+        point2: const GeoreferenceControlPoint(
+          local: MapCoordinate(x: 100, y: 0),
+          target: MapCoordinate(x: 500100, y: 1800000),
+        ),
+        targetCrs: utm48North,
+      );
+      final source = GeoCadProjectDocument(
+        project: MapProject(
+          id: 'bylayer',
+          name: 'BYLAYER',
+          layers: [georeferenced.layer],
+        ),
+        createdAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+      const persistence = ProjectPersistenceService();
+      final restored = persistence.deserialize(persistence.serialize(source));
+      final properties =
+          restored.project.layers.single.features.single.properties;
+
+      expect(properties['cadLayer'], 'ROADS');
+      expect(properties['cad.colorIndex'], '256');
+      expect(properties['cad.layer.colorIndex'], '3');
+      expect(properties['cad.layer.flags'], '4');
+      expect(properties['style.strokeColor'], '#00FF00');
+    },
+  );
+
+  test(
     'KML -> WGS84 -> UTM -> DXF -> DXF import round-trips geometry',
     () async {
       const kml = '''

@@ -168,6 +168,48 @@ void main() {
     },
   );
 
+  test('resolved DXF BYLAYER metadata survives project round-trip', () {
+    final source = document(
+      const MapProject(
+        id: 'dxf-bylayer',
+        name: 'DXF BYLAYER',
+        layers: [
+          MapLayer(
+            id: 'dxf-layer',
+            name: 'drawing.dxf',
+            sourceType: MapLayerSourceType.dxf,
+            features: [
+              MapFeature(
+                id: 'line',
+                type: MapFeatureType.line,
+                coordinates: [
+                  MapCoordinate(x: 0, y: 0),
+                  MapCoordinate(x: 1, y: 1),
+                ],
+                properties: {
+                  'cadLayer': 'ROADS',
+                  'cad.colorIndex': '256',
+                  'cad.layer.colorIndex': '-3',
+                  'cad.layer.flags': '5',
+                  'style.strokeColor': '#00FF00',
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final restored = service.deserialize(service.serialize(source));
+    expect(restored.project.layers.single.features.single.properties, {
+      'cadLayer': 'ROADS',
+      'cad.colorIndex': '256',
+      'cad.layer.colorIndex': '-3',
+      'cad.layer.flags': '5',
+      'style.strokeColor': '#00FF00',
+    });
+  });
+
   test('project canvas CRS round-trips for WGS84 and UTM', () {
     const projects = [
       MapProject(

@@ -580,6 +580,33 @@ void main() {
       expect(textRecord.value(420), isNull);
       expect(textRecord.value(1), 'Điểm màu – ຈຸດສີ – Color point');
     });
+
+    test('does not reconstruct imported BYLAYER color or emit entity 256', () {
+      final result = exportFeatures([
+        feature(
+          'bylayer',
+          MapFeatureType.point,
+          const [MapCoordinate(x: 1, y: 2)],
+          properties: const {
+            'cadLayer': 'ROADS',
+            'cad.colorIndex': '256',
+            'cad.layer.colorIndex': '3',
+            'cad.layer.flags': '4',
+            'style.strokeColor': '#00FF00',
+          },
+        ),
+      ]);
+
+      final records = _records(_pairs(result.content));
+      final point = records.singleWhere((record) => record.type == 'POINT');
+      final layerRecord = records.singleWhere(
+        (record) => record.type == 'LAYER' && record.value(2) == 'ROADS',
+      );
+      expect(point.value(8), 'ROADS');
+      expect(point.value(62), isNull);
+      expect(layerRecord.value(62), '7');
+      expect(layerRecord.value(70), '0');
+    });
   });
 
   test('current parser still round trips R12 POINT LINE and TEXT', () async {

@@ -52,6 +52,38 @@ EOF
     return service.parseFile(file.path);
   }
 
+  Future<DxfParseResult> parseWithLayers({
+    required String layers,
+    required String entities,
+  }) {
+    return parseRaw('''
+0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LAYER
+70
+0
+${layers.trim()}
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+${entities.trim()}
+0
+ENDSEC
+0
+EOF
+''');
+  }
+
   test('parses CIRCLE as a smooth closed polyline and preserves Z', () async {
     final result = await parseEntities('''
 0
@@ -1085,6 +1117,292 @@ $label
       expect(feature.properties['style.strokeColor'], '#FF00FF');
       expect(result.diagnostics.parsedEntityCount, 1);
       expect(result.diagnostics.hasIssues, isFalse);
+    });
+  });
+
+  group('DXF LAYER color and BYLAYER resolution', () {
+    test(
+      'resolves representative layer ACI values for explicit BYLAYER',
+      () async {
+        for (final sample in const [
+          (name: 'ACI-1', aci: '1', color: '#FF0000'),
+          // ACI 10-249 uses the current approximate mapping.
+          (name: 'ACI-123', aci: '123', color: '#80FFDF'),
+          (name: 'ACI-250', aci: '250', color: '#333333'),
+        ]) {
+          final result = await parseWithLayers(
+            layers:
+                '''
+0
+LAYER
+2
+${sample.name}
+70
+0
+62
+${sample.aci}
+''',
+            entities:
+                '''
+0
+POINT
+8
+${sample.name}
+62
+256
+10
+1
+20
+2
+''',
+          );
+          final properties = result.features.single.properties;
+          expect(properties['cad.colorIndex'], '256');
+          expect(properties['cad.layer.colorIndex'], sample.aci);
+          expect(properties['cad.layer.flags'], '0');
+          expect(properties['style.strokeColor'], sample.color);
+        }
+      },
+    );
+
+    test(
+      'uses absolute negative layer ACI while preserving raw value',
+      () async {
+        final result = await parseWithLayers(
+          layers: '0\nLAYER\n2\nOFF\n70\n5\n62\n-3',
+          entities: '0\nLINE\n8\nOFF\n62\n256\n10\n0\n20\n0\n11\n1\n21\n1',
+        );
+        final properties = result.features.single.properties;
+        expect(properties['cad.layer.colorIndex'], '-3');
+        expect(properties['cad.layer.flags'], '5');
+        expect(properties['style.strokeColor'], '#00FF00');
+        expect(result.features.single.visible, isTrue);
+      },
+    );
+
+    test(
+      'implicit BYLAYER resolves but preserves absence of entity color',
+      () async {
+        final result = await parseWithLayers(
+          layers: '0\nLAYER\n2\nIMPLICIT\n70\n0\n62\n2',
+          entities: '0\nCIRCLE\n8\nIMPLICIT\n10\n0\n20\n0\n40\n1',
+        );
+        final properties = result.features.single.properties;
+        expect(properties.containsKey('cad.colorIndex'), isFalse);
+        expect(properties['cad.layer.colorIndex'], '2');
+        expect(properties['style.strokeColor'], '#FFFF00');
+      },
+    );
+
+    test('entity ACI and valid True Color override layer color', () async {
+      final result = await parseWithLayers(
+        layers: '0\nLAYER\n2\nOVERRIDE\n70\n0\n62\n1',
+        entities: '''
+0
+POINT
+8
+OVERRIDE
+62
+3
+10
+0
+20
+0
+0
+TEXT
+8
+OVERRIDE
+62
+256
+420
+255
+10
+1
+20
+1
+1
+Blue
+''',
+      );
+      expect(result.features[0].properties['style.strokeColor'], '#00FF00');
+      expect(result.features[1].properties['style.strokeColor'], '#0000FF');
+      for (final feature in result.features) {
+        expect(feature.properties['cad.layer.colorIndex'], '1');
+      }
+    });
+
+    test('invalid True Color with BYLAYER falls back to layer color', () async {
+      final result = await parseWithLayers(
+        layers: '0\nLAYER\n2\nFALLBACK\n70\n0\n62\n6',
+        entities: '0\nPOINT\n8\nFALLBACK\n62\n256\n420\ninvalid\n10\n0\n20\n0',
+      );
+      final properties = result.features.single.properties;
+      expect(properties['cad.trueColor'], 'invalid');
+      expect(properties['style.strokeColor'], '#FF00FF');
+    });
+
+    test('BYBLOCK does not fall back to layer color', () async {
+      final result = await parseWithLayers(
+        layers: '0\nLAYER\n2\nBLOCK\n70\n0\n62\n1',
+        entities: '0\nPOINT\n8\nBLOCK\n62\n0\n10\n0\n20\n0',
+      );
+      final properties = result.features.single.properties;
+      expect(properties['cad.layer.colorIndex'], '1');
+      expect(properties.containsKey('style.strokeColor'), isFalse);
+    });
+
+    test('missing group 8 does not default to layer zero', () async {
+      final result = await parseWithLayers(
+        layers: '0\nLAYER\n2\n0\n70\n0\n62\n1',
+        entities: '0\nPOINT\n62\n256\n10\n0\n20\n0',
+      );
+      final properties = result.features.single.properties;
+      expect(properties.containsKey('cadLayer'), isFalse);
+      expect(properties.containsKey('cad.layer.colorIndex'), isFalse);
+      expect(properties.containsKey('style.strokeColor'), isFalse);
+    });
+
+    test('explicit Unicode and zero layer names resolve exactly', () async {
+      for (final sample in const [
+        (name: '0', aci: '4', color: '#00FFFF'),
+        (name: 'Đường – ເສັ້ນ', aci: '6', color: '#FF00FF'),
+      ]) {
+        final result = await parseWithLayers(
+          layers: '0\nLAYER\n2\n${sample.name}\n70\n4\n62\n${sample.aci}',
+          entities: '0\nPOINT\n8\n${sample.name}\n62\n256\n10\n0\n20\n0',
+        );
+        final properties = result.features.single.properties;
+        expect(properties['cadLayer'], sample.name);
+        expect(properties['cad.layer.flags'], '4');
+        expect(properties['style.strokeColor'], sample.color);
+      }
+    });
+
+    test('unknown duplicate and case-mismatched layers fail soft', () async {
+      final result = await parseWithLayers(
+        layers: '''
+0
+LAYER
+2
+DUP
+70
+0
+62
+1
+0
+LAYER
+2
+DUP
+70
+0
+62
+2
+0
+LAYER
+2
+Case
+70
+0
+62
+3
+''',
+        entities: '''
+0
+POINT
+8
+DUP
+62
+256
+10
+0
+20
+0
+0
+POINT
+8
+UNKNOWN
+62
+256
+10
+1
+20
+1
+0
+POINT
+8
+case
+62
+256
+10
+2
+20
+2
+''',
+      );
+      expect(result.features, hasLength(3));
+      for (final feature in result.features) {
+        expect(feature.properties.containsKey('cad.layer.colorIndex'), isFalse);
+        expect(feature.properties.containsKey('style.strokeColor'), isFalse);
+      }
+    });
+
+    test(
+      'malformed missing zero and 256 layer colors do not resolve',
+      () async {
+        for (final rawColor in const ['invalid', '', '0', '256']) {
+          final colorPair = rawColor.isEmpty ? '' : '62\n$rawColor';
+          final result = await parseWithLayers(
+            layers: '0\nLAYER\n2\nNO-COLOR\n70\ninvalid\n$colorPair',
+            entities: '0\nPOINT\n8\nNO-COLOR\n62\n256\n10\n0\n20\n0',
+          );
+          final properties = result.features.single.properties;
+          if (rawColor.isEmpty) {
+            expect(properties.containsKey('cad.layer.colorIndex'), isFalse);
+          } else {
+            expect(properties['cad.layer.colorIndex'], rawColor);
+          }
+          expect(properties.containsKey('cad.layer.flags'), isFalse);
+          expect(properties.containsKey('style.strokeColor'), isFalse);
+        }
+      },
+    );
+
+    test('R12 POLYLINE resolves color from its header layer', () async {
+      final result = await parseWithLayers(
+        layers: '0\nLAYER\n2\nR12\n70\n0\n62\n5',
+        entities: '''
+0
+POLYLINE
+8
+R12
+62
+256
+70
+0
+0
+VERTEX
+10
+0
+20
+0
+70
+0
+0
+VERTEX
+10
+1
+20
+1
+70
+0
+0
+SEQEND
+''',
+      );
+      final properties = result.features.single.properties;
+      expect(properties['entityType'], 'POLYLINE');
+      expect(properties['cad.layer.colorIndex'], '5');
+      expect(properties['style.strokeColor'], '#0000FF');
     });
   });
 

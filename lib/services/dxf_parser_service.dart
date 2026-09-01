@@ -49,8 +49,9 @@ class DxfParserService {
     }
 
     final sections = _findSections(pairs);
+    final layerIndex = _buildLayerIndex(pairs);
     _validateEntitiesSection(pairs);
-    final entitiesResult = _parseEntities(pairs);
+    final entitiesResult = _parseEntities(pairs, layerIndex);
 
     return DxfParseResult(
       filePath: filePath,
@@ -128,7 +129,10 @@ class DxfParserService {
     throw const DxfParserException('SECTION ENTITIES không có ENDSEC hợp lệ.');
   }
 
-  _DxfEntitiesParseResult _parseEntities(List<DxfGroupPair> pairs) {
+  _DxfEntitiesParseResult _parseEntities(
+    List<DxfGroupPair> pairs,
+    _DxfLayerIndex layerIndex,
+  ) {
     final entityPairs = _getEntitiesSection(pairs);
 
     if (entityPairs.isEmpty) {
@@ -169,7 +173,7 @@ class DxfParserService {
         if (polylineResult.feature == null) {
           malformedCount++;
         } else {
-          features.add(polylineResult.feature!);
+          features.add(_applyLayerColor(polylineResult.feature!, layerIndex));
           featureIndex++;
         }
         index = polylineResult.nextIndex;
@@ -266,7 +270,7 @@ class DxfParserService {
         continue;
       }
 
-      features.add(feature);
+      features.add(_applyLayerColor(feature, layerIndex));
       featureIndex++;
 
       index = nextEntityIndex;
@@ -286,6 +290,126 @@ class DxfParserService {
         issues: issues,
       ),
     );
+  }
+
+  _DxfLayerIndex _buildLayerIndex(List<DxfGroupPair> pairs) {
+    final definitions = <String, _DxfLayerDefinition>{};
+    final ambiguousNames = <String>{};
+    var tablesStart = -1;
+
+    for (var index = 0; index < pairs.length - 1; index++) {
+      if (pairs[index].code == 0 &&
+          pairs[index].value.toUpperCase() == 'SECTION' &&
+          pairs[index + 1].code == 2 &&
+          pairs[index + 1].value.toUpperCase() == 'TABLES') {
+        tablesStart = index + 2;
+        break;
+      }
+    }
+    if (tablesStart < 0) return const _DxfLayerIndex();
+
+    var cursor = tablesStart;
+    while (cursor < pairs.length) {
+      final marker = pairs[cursor];
+      if (marker.code == 0 && marker.value.toUpperCase() == 'ENDSEC') break;
+      if (marker.code != 0 || marker.value.toUpperCase() != 'TABLE') {
+        cursor++;
+        continue;
+      }
+
+      final tableName = cursor + 1 < pairs.length && pairs[cursor + 1].code == 2
+          ? pairs[cursor + 1].value
+          : null;
+      final tableEnd = _findMarker(pairs, cursor + 1, 'ENDTAB');
+      if (tableEnd < 0) break;
+
+      if (tableName?.toUpperCase() == 'LAYER') {
+        var recordStart = cursor + 2;
+        while (recordStart < tableEnd) {
+          final recordMarker = pairs[recordStart];
+          if (recordMarker.code != 0 ||
+              recordMarker.value.toUpperCase() != 'LAYER') {
+            recordStart++;
+            continue;
+          }
+
+          final recordEnd = _findNextEntityIndex(pairs, recordStart + 1);
+          final data = pairs.sublist(
+            recordStart + 1,
+            math.min(recordEnd, tableEnd),
+          );
+          final name = _readString(data, 2);
+          if (name != null && name.isNotEmpty) {
+            final rawFlags = _readString(data, 70);
+            final definition = _DxfLayerDefinition(
+              rawColorIndex: _readString(data, 62),
+              flags: rawFlags == null ? null : int.tryParse(rawFlags),
+            );
+            if (ambiguousNames.contains(name) ||
+                definitions.containsKey(name)) {
+              definitions.remove(name);
+              ambiguousNames.add(name);
+            } else {
+              definitions[name] = definition;
+            }
+          }
+          recordStart = recordEnd;
+        }
+      }
+      cursor = tableEnd + 1;
+    }
+
+    return _DxfLayerIndex(
+      definitions: definitions,
+      ambiguousNames: ambiguousNames,
+    );
+  }
+
+  int _findMarker(List<DxfGroupPair> pairs, int startIndex, String value) {
+    for (var index = startIndex; index < pairs.length; index++) {
+      final pair = pairs[index];
+      if (pair.code == 0 && pair.value.toUpperCase() == value) return index;
+      if (pair.code == 0 && pair.value.toUpperCase() == 'ENDSEC') return -1;
+    }
+    return -1;
+  }
+
+  MapFeature _applyLayerColor(MapFeature feature, _DxfLayerIndex layerIndex) {
+    final layerName = feature.properties['cadLayer'];
+    if (layerName == null) return feature;
+    final definition = layerIndex.lookup(layerName);
+    if (definition == null) return feature;
+
+    final properties = Map<String, String>.from(feature.properties);
+    final rawLayerColor = definition.rawColorIndex;
+    if (rawLayerColor != null && rawLayerColor.isNotEmpty) {
+      properties['cad.layer.colorIndex'] = rawLayerColor;
+    }
+    if (definition.flags != null) {
+      properties['cad.layer.flags'] = definition.flags.toString();
+    }
+
+    final rawEntityColor = properties['cad.colorIndex'];
+    final entityColor = rawEntityColor == null
+        ? null
+        : int.tryParse(rawEntityColor.trim());
+    final usesLayerColor = rawEntityColor == null || entityColor == 256;
+    if (usesLayerColor && !properties.containsKey('style.strokeColor')) {
+      final parsedLayerColor = rawLayerColor == null
+          ? null
+          : int.tryParse(rawLayerColor.trim());
+      if (parsedLayerColor != null) {
+        final colorIdentity = parsedLayerColor.abs();
+        if (colorIdentity >= 1 && colorIdentity <= 255) {
+          final canonicalColor = _cadColorService.aciToHex('$colorIdentity');
+          if (canonicalColor != null) {
+            properties['style.strokeColor'] = canonicalColor;
+          }
+        }
+      }
+    }
+
+    return feature.copyWith(properties: properties);
   }
 
   static const _supportedEntityTypes = <String>{
@@ -1403,6 +1527,28 @@ class _DxfEntitiesParseResult {
     required List<MapFeature> features,
     required this.diagnostics,
   }) : features = List.unmodifiable(features);
+}
+
+class _DxfLayerIndex {
+  final Map<String, _DxfLayerDefinition> definitions;
+  final Set<String> ambiguousNames;
+
+  const _DxfLayerIndex({
+    this.definitions = const {},
+    this.ambiguousNames = const {},
+  });
+
+  _DxfLayerDefinition? lookup(String name) {
+    if (ambiguousNames.contains(name)) return null;
+    return definitions[name];
+  }
+}
+
+class _DxfLayerDefinition {
+  final String? rawColorIndex;
+  final int? flags;
+
+  const _DxfLayerDefinition({this.rawColorIndex, this.flags});
 }
 
 class DxfParseResult {
