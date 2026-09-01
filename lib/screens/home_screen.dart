@@ -13,6 +13,7 @@ import '../models/map_feature_change.dart';
 import '../models/map_layer.dart';
 import '../models/map_project.dart';
 import '../services/cad_file_service.dart';
+import '../services/canvas_coordinate_service.dart';
 import '../services/dxf_parser_service.dart';
 import '../services/dxf_export_service.dart';
 import '../services/project_history_service.dart';
@@ -62,6 +63,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final CadFileService _cadFileService = const CadFileService();
+  final CanvasCoordinateService _canvasCoordinateService =
+      const CanvasCoordinateService();
   final DxfParserService _dxfParserService = const DxfParserService();
   final DxfExportService _dxfExportService = const DxfExportService();
   final LayerReprojectionService _layerReprojectionService =
@@ -830,6 +833,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (layer.sourceType == MapLayerSourceType.manual &&
           layer.name == 'Manual Drawing' &&
           layer.sourcePath == null &&
+          _canvasCoordinateService.isSameCrs(layer.crs, _project.canvasCrs) &&
           !layer.locked) {
         drawingLayer = layer;
         break;
@@ -845,6 +849,7 @@ class _HomeScreenState extends State<HomeScreen> {
           name: 'Manual Drawing',
           sourceType: MapLayerSourceType.manual,
           sourcePath: null,
+          crs: _project.canvasCrs,
           features: [feature],
         );
         _project = _project.addLayer(layer);

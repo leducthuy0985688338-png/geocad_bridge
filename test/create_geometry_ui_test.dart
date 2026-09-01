@@ -1,3 +1,4 @@
+import 'package:autocad_googleearth/models/coordinate_reference_system.dart';
 import 'package:autocad_googleearth/models/map_feature.dart';
 import 'package:autocad_googleearth/models/map_feature_change.dart';
 import 'package:autocad_googleearth/models/map_layer.dart';
@@ -255,6 +256,86 @@ void main() {
     expect(drawingLayers.single.sourceType, MapLayerSourceType.manual);
     expect(drawingLayers.single.sourcePath, isNull);
     expect(drawingLayers.single.features, hasLength(2));
+  });
+
+  testWidgets('Manual Drawing uses the project canvas CRS', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HomeScreen(
+          initialProject: MapProject(
+            id: 'project',
+            name: 'Project',
+            canvasCrs: CoordinateReferenceSystem.utm(
+              utmZone: 48,
+              hemisphere: UtmHemisphere.north,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('draw-point')));
+    await tester.tapAt(canvasPosition(tester, 450, 350));
+    await tester.pump();
+
+    final layer = tester
+        .widget<MapCanvas>(find.byType(MapCanvas))
+        .project
+        .layers
+        .single;
+    expect(layer.name, 'Manual Drawing');
+    expect(layer.crs.epsgCode, 32648);
+  });
+
+  testWidgets('Manual Drawing with a different CRS is not reused', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HomeScreen(
+          initialProject: MapProject(
+            id: 'project',
+            name: 'Project',
+            layers: [
+              MapLayer(
+                id: 'wrong-crs',
+                name: 'Manual Drawing',
+                sourceType: MapLayerSourceType.manual,
+                crs: CoordinateReferenceSystem.wgs84(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('draw-point')));
+    await tester.tapAt(canvasPosition(tester, 450, 350));
+    await tester.pump();
+
+    final layers = tester
+        .widget<MapCanvas>(find.byType(MapCanvas))
+        .project
+        .layers;
+    expect(layers, hasLength(2));
+    expect(
+      layers.singleWhere((layer) => layer.id == 'wrong-crs').features,
+      isEmpty,
+    );
+    final created = layers.singleWhere((layer) => layer.id != 'wrong-crs');
+    expect(created.name, 'Manual Drawing');
+    expect(created.crs.isLocalCad, isTrue);
+    expect(created.features, hasLength(1));
   });
 
   testWidgets('creation is one undoable and redoable transaction', (

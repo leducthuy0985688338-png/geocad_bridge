@@ -124,6 +124,69 @@ void main() {
     expect(restored.updatedAt, updatedAt);
     expect(restored.project.id, 'empty');
     expect(restored.project.layers, isEmpty);
+    expect(restored.project.canvasCrs.isLocalCad, isTrue);
+  });
+
+  test('project canvas CRS round-trips for WGS84 and UTM', () {
+    const projects = [
+      MapProject(
+        id: 'wgs',
+        name: 'WGS',
+        canvasCrs: CoordinateReferenceSystem.wgs84(),
+      ),
+      MapProject(
+        id: 'utm',
+        name: 'UTM',
+        canvasCrs: CoordinateReferenceSystem.utm(
+          utmZone: 48,
+          hemisphere: UtmHemisphere.north,
+        ),
+      ),
+      MapProject(
+        id: 'utm-south',
+        name: 'UTM South',
+        canvasCrs: CoordinateReferenceSystem.utm(
+          utmZone: 56,
+          hemisphere: UtmHemisphere.south,
+        ),
+      ),
+    ];
+
+    final restored = projects
+        .map(
+          (project) =>
+              service.deserialize(service.serialize(document(project))).project,
+        )
+        .toList();
+    expect(restored[0].canvasCrs.isWgs84, isTrue);
+    expect(restored[1].canvasCrs.epsgCode, 32648);
+    expect(restored[2].canvasCrs.epsgCode, 32756);
+  });
+
+  test('legacy projects without canvas CRS use deterministic local CAD', () {
+    final legacyProjects = <MapProject>[
+      const MapProject(id: 'empty', name: 'Empty'),
+      const MapProject(
+        id: 'local',
+        name: 'Local',
+        layers: [
+          MapLayer(
+            id: 'local-layer',
+            name: 'Local',
+            sourceType: MapLayerSourceType.dxf,
+          ),
+        ],
+      ),
+      completeProject(),
+    ];
+
+    for (final project in legacyProjects) {
+      final root = decodedDocument(project);
+      (root['project'] as Map).remove('canvasCrs');
+      final restored = service.deserialize(jsonEncode(root));
+      expect(restored.project.canvasCrs.isLocalCad, isTrue);
+      expect(restored.project.layers, hasLength(project.layers.length));
+    }
   });
 
   test(

@@ -165,6 +165,7 @@ class ProjectPersistenceService {
   Map<String, Object?> _encodeProject(MapProject project) => {
     'id': project.id,
     'name': project.name,
+    'canvasCrs': _encodeCrs(project.canvasCrs),
     'description': project.description,
     'properties': _sortedProperties(project.properties),
     'layers': project.layers.map(_encodeLayer).toList(),
@@ -229,6 +230,9 @@ class ProjectPersistenceService {
     return MapProject(
       id: _requiredNonEmptyString(json, 'id'),
       name: _requiredNonEmptyString(json, 'name'),
+      canvasCrs: json['canvasCrs'] == null
+          ? const CoordinateReferenceSystem.localCad()
+          : _decodeCrs(_object(json['canvasCrs'], 'canvasCrs')),
       description: _optionalString(json, 'description'),
       properties: _properties(json, 'properties'),
       layers: layers,
