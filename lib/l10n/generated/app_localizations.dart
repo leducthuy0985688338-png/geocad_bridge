@@ -946,6 +946,78 @@ abstract class AppLocalizations {
   /// **'Đã thêm {count} file KML vào dự án.{skippedText}'**
   String kmlFilesAdded(Object count, Object skippedText);
 
+  /// No description provided for @kmlImportPartialTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhập KML hoàn tất với cảnh báo'**
+  String get kmlImportPartialTitle;
+
+  /// No description provided for @kmlImportPartialNotice.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉ hình học hợp lệ được nhập. Một phần dữ liệu KML đã bị bỏ qua hoặc không đọc được.'**
+  String get kmlImportPartialNotice;
+
+  /// No description provided for @kmlImportedGeometryCount.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hình học đã nhập: {count}'**
+  String kmlImportedGeometryCount(int count);
+
+  /// No description provided for @kmlMalformedGeometryCount.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hình học lỗi đã bỏ qua: {count}'**
+  String kmlMalformedGeometryCount(int count);
+
+  /// No description provided for @kmlUnsupportedGeometryCount.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hình học chưa hỗ trợ đã bỏ qua: {count}'**
+  String kmlUnsupportedGeometryCount(int count);
+
+  /// No description provided for @kmlFidelityWarningCount.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cảnh báo fidelity: {count}'**
+  String kmlFidelityWarningCount(int count);
+
+  /// No description provided for @kmlUnsupportedGeometryTypeCount.
+  ///
+  /// In vi, this message translates to:
+  /// **'  • {geometryType}: {count}'**
+  String kmlUnsupportedGeometryTypeCount(String geometryType, int count);
+
+  /// No description provided for @kmlNoLayersAdded.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không có layer KML nào được thêm.'**
+  String get kmlNoLayersAdded;
+
+  /// No description provided for @kmlFatalImportFailure.
+  ///
+  /// In vi, this message translates to:
+  /// **'{fileName}: Không thể đọc file KML.'**
+  String kmlFatalImportFailure(String fileName);
+
+  /// No description provided for @kmlAdditionalSummaryItems.
+  ///
+  /// In vi, this message translates to:
+  /// **'và {count} mục khác'**
+  String kmlAdditionalSummaryItems(int count);
+
+  /// No description provided for @kmlDiagnosticFileHeading.
+  ///
+  /// In vi, this message translates to:
+  /// **'File: {fileName}'**
+  String kmlDiagnosticFileHeading(String fileName);
+
+  /// No description provided for @kmlImportWarningsHeading.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chi tiết nhập dữ liệu'**
+  String get kmlImportWarningsHeading;
+
   /// No description provided for @featureOwnerLayerNotFound.
   ///
   /// In vi, this message translates to:

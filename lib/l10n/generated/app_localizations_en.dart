@@ -507,6 +507,59 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get kmlImportPartialTitle => 'KML import completed with warnings';
+
+  @override
+  String get kmlImportPartialNotice =>
+      'Only valid geometry was imported. Some KML data was skipped or could not be read.';
+
+  @override
+  String kmlImportedGeometryCount(int count) {
+    return 'Imported geometry: $count';
+  }
+
+  @override
+  String kmlMalformedGeometryCount(int count) {
+    return 'Malformed geometry skipped: $count';
+  }
+
+  @override
+  String kmlUnsupportedGeometryCount(int count) {
+    return 'Unsupported geometry skipped: $count';
+  }
+
+  @override
+  String kmlFidelityWarningCount(int count) {
+    return 'Fidelity warnings: $count';
+  }
+
+  @override
+  String kmlUnsupportedGeometryTypeCount(String geometryType, int count) {
+    return '  • $geometryType: $count';
+  }
+
+  @override
+  String get kmlNoLayersAdded => 'No KML layer was added.';
+
+  @override
+  String kmlFatalImportFailure(String fileName) {
+    return '$fileName: The KML file could not be read.';
+  }
+
+  @override
+  String kmlAdditionalSummaryItems(int count) {
+    return 'and $count more';
+  }
+
+  @override
+  String kmlDiagnosticFileHeading(String fileName) {
+    return 'File: $fileName';
+  }
+
+  @override
+  String get kmlImportWarningsHeading => 'Import details';
+
+  @override
   String get featureOwnerLayerNotFound =>
       'Could not find the layer containing this object.';
 

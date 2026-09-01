@@ -506,6 +506,59 @@ class AppLocalizationsLo extends AppLocalizations {
   }
 
   @override
+  String get kmlImportPartialTitle => 'ນຳເຂົ້າ KML ສຳເລັດໂດຍມີຄຳເຕືອນ';
+
+  @override
+  String get kmlImportPartialNotice =>
+      'ນຳເຂົ້າສະເພາະ geometry ທີ່ຖືກຕ້ອງ. ຂໍ້ມູນ KML ບາງສ່ວນຖືກຂ້າມ ຫຼື ອ່ານບໍ່ໄດ້.';
+
+  @override
+  String kmlImportedGeometryCount(int count) {
+    return 'Geometry ທີ່ນຳເຂົ້າ: $count';
+  }
+
+  @override
+  String kmlMalformedGeometryCount(int count) {
+    return 'Geometry ຜິດຮູບແບບທີ່ຂ້າມ: $count';
+  }
+
+  @override
+  String kmlUnsupportedGeometryCount(int count) {
+    return 'Geometry ທີ່ຍັງບໍ່ຮອງຮັບ: $count';
+  }
+
+  @override
+  String kmlFidelityWarningCount(int count) {
+    return 'ຄຳເຕືອນ fidelity: $count';
+  }
+
+  @override
+  String kmlUnsupportedGeometryTypeCount(String geometryType, int count) {
+    return '  • $geometryType: $count';
+  }
+
+  @override
+  String get kmlNoLayersAdded => 'ບໍ່ມີ layer KML ຖືກເພີ່ມ.';
+
+  @override
+  String kmlFatalImportFailure(String fileName) {
+    return '$fileName: ບໍ່ສາມາດອ່ານໄຟລ໌ KML.';
+  }
+
+  @override
+  String kmlAdditionalSummaryItems(int count) {
+    return 'ແລະອີກ $count ລາຍການ';
+  }
+
+  @override
+  String kmlDiagnosticFileHeading(String fileName) {
+    return 'ໄຟລ໌: $fileName';
+  }
+
+  @override
+  String get kmlImportWarningsHeading => 'ລາຍລະອຽດການນຳເຂົ້າ';
+
+  @override
   String get featureOwnerLayerNotFound => 'ບໍ່ພົບ layer ທີ່ມີວັດຖຸນີ້.';
 
   @override

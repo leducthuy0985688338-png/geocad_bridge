@@ -509,6 +509,59 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get kmlImportPartialTitle => 'Nhập KML hoàn tất với cảnh báo';
+
+  @override
+  String get kmlImportPartialNotice =>
+      'Chỉ hình học hợp lệ được nhập. Một phần dữ liệu KML đã bị bỏ qua hoặc không đọc được.';
+
+  @override
+  String kmlImportedGeometryCount(int count) {
+    return 'Hình học đã nhập: $count';
+  }
+
+  @override
+  String kmlMalformedGeometryCount(int count) {
+    return 'Hình học lỗi đã bỏ qua: $count';
+  }
+
+  @override
+  String kmlUnsupportedGeometryCount(int count) {
+    return 'Hình học chưa hỗ trợ đã bỏ qua: $count';
+  }
+
+  @override
+  String kmlFidelityWarningCount(int count) {
+    return 'Cảnh báo fidelity: $count';
+  }
+
+  @override
+  String kmlUnsupportedGeometryTypeCount(String geometryType, int count) {
+    return '  • $geometryType: $count';
+  }
+
+  @override
+  String get kmlNoLayersAdded => 'Không có layer KML nào được thêm.';
+
+  @override
+  String kmlFatalImportFailure(String fileName) {
+    return '$fileName: Không thể đọc file KML.';
+  }
+
+  @override
+  String kmlAdditionalSummaryItems(int count) {
+    return 'và $count mục khác';
+  }
+
+  @override
+  String kmlDiagnosticFileHeading(String fileName) {
+    return 'File: $fileName';
+  }
+
+  @override
+  String get kmlImportWarningsHeading => 'Chi tiết nhập dữ liệu';
+
+  @override
   String get featureOwnerLayerNotFound =>
       'Không tìm thấy layer chứa đối tượng.';
 

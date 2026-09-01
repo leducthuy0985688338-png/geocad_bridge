@@ -36,6 +36,41 @@ typedef ProjectSavePathSelector = Future<String?> Function({
 
 typedef CadDocumentsSelector = Future<List<CadDocument>> Function();
 
+typedef KmlFilesSelector = Future<List<PlatformFile>> Function();
+
+class _KmlImportFileSummary {
+  final String fileName;
+  final int importedGeometryCount;
+  final int malformedGeometryCount;
+  final Map<String, int> unsupportedGeometryCounts;
+  final int fidelityWarningCount;
+  final bool isFatal;
+
+  const _KmlImportFileSummary({
+    required this.fileName,
+    required this.importedGeometryCount,
+    required this.malformedGeometryCount,
+    required this.unsupportedGeometryCounts,
+    required this.fidelityWarningCount,
+  }) : isFatal = false;
+
+  const _KmlImportFileSummary.fatal(this.fileName)
+    : importedGeometryCount = 0,
+      malformedGeometryCount = 0,
+      unsupportedGeometryCounts = const {},
+      fidelityWarningCount = 0,
+      isFatal = true;
+
+  int get unsupportedGeometryCount =>
+      unsupportedGeometryCounts.values.fold(0, (sum, count) => sum + count);
+
+  bool get hasIssues =>
+      isFatal ||
+      malformedGeometryCount > 0 ||
+      unsupportedGeometryCount > 0 ||
+      fidelityWarningCount > 0;
+}
+
 class HomeScreen extends StatefulWidget {
   final MapProject? initialProject;
   final Future<bool> Function(MapProject project)? saveProjectOverride;
@@ -45,6 +80,7 @@ class HomeScreen extends StatefulWidget {
   final Future<CoordinateReferenceSystem?> Function(MapLayer layer)?
   selectUtmCrsOverride;
   final CadDocumentsSelector? cadDocumentsSelectorOverride;
+  final KmlFilesSelector? kmlFilesSelectorOverride;
 
   const HomeScreen({
     super.key,
@@ -55,6 +91,7 @@ class HomeScreen extends StatefulWidget {
     this.saveDxfOverride,
     this.selectUtmCrsOverride,
     this.cadDocumentsSelectorOverride,
+    this.kmlFilesSelectorOverride,
   });
 
   @override
@@ -442,11 +479,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isImporting || _isProjectBusy) return;
     final l10n = AppLocalizations.of(context);
 
-    final files = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['kml'],
-      dialogTitle: l10n.selectGoogleEarthKml,
-    );
+    final selector = widget.kmlFilesSelectorOverride;
+    final files = selector != null
+        ? await selector()
+        : await FilePicker.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: const ['kml'],
+            dialogTitle: l10n.selectGoogleEarthKml,
+          );
 
     if (files.isEmpty || !mounted) {
       return;
@@ -457,7 +497,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     final newLayers = <MapLayer>[];
-    final errors = <String>[];
+    final summaries = <_KmlImportFileSummary>[];
     var skippedCount = 0;
 
     try {
@@ -465,7 +505,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final path = file.path;
 
         if (path == null || path.trim().isEmpty) {
-          errors.add(l10n.filePathUnavailable(file.name));
+          summaries.add(_KmlImportFileSummary.fatal(file.name));
           continue;
         }
 
@@ -477,8 +517,22 @@ class _HomeScreenState extends State<HomeScreen> {
         try {
           final parsed = await _kmlParserService.parseFile(path);
 
+          final diagnostics = parsed.diagnostics;
+          summaries.add(
+            _KmlImportFileSummary(
+              fileName: file.name,
+              importedGeometryCount: diagnostics.parsedGeometryCount,
+              malformedGeometryCount: diagnostics.malformedGeometryCount,
+              unsupportedGeometryCounts: diagnostics.unsupportedGeometryCounts,
+              fidelityWarningCount: diagnostics.issues
+                  .where(
+                    (issue) => issue.code == KmlDiagnosticCode.fidelityWarning,
+                  )
+                  .length,
+            ),
+          );
+
           if (parsed.features.isEmpty) {
-            errors.add(l10n.kmlNoValidGeometry(file.name));
             continue;
           }
 
@@ -501,8 +555,8 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           );
-        } catch (error) {
-          errors.add('${file.name}: $error');
+        } catch (_) {
+          summaries.add(_KmlImportFileSummary.fatal(file.name));
         }
       }
 
@@ -516,12 +570,13 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
 
-      if (newLayers.isEmpty && errors.isEmpty && skippedCount > 0) {
+      if (newLayers.isEmpty && summaries.isEmpty && skippedCount > 0) {
         _showMessage(l10n.selectedKmlAlreadyInProject);
         return;
       }
 
-      if (errors.isEmpty) {
+      final hasWarnings = summaries.any((summary) => summary.hasIssues);
+      if (newLayers.isNotEmpty && !hasWarnings) {
         final skippedText = skippedCount > 0
             ? l10n.skippedExistingFiles(skippedCount)
             : '';
@@ -533,7 +588,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _showGoogleEarthImportResult(
         importedCount: newLayers.length,
         skippedCount: skippedCount,
-        errors: errors,
+        summaries: summaries,
+        isPartial: newLayers.isNotEmpty,
       );
     } finally {
       if (mounted) {
@@ -547,16 +603,37 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showGoogleEarthImportResult({
     required int importedCount,
     required int skippedCount,
-    required List<String> errors,
+    required List<_KmlImportFileSummary> summaries,
+    required bool isPartial,
   }) {
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
+    final importedGeometryCount = summaries.fold(
+      0,
+      (sum, summary) => sum + summary.importedGeometryCount,
+    );
+    final malformedGeometryCount = summaries.fold(
+      0,
+      (sum, summary) => sum + summary.malformedGeometryCount,
+    );
+    final unsupportedGeometryCount = summaries.fold(
+      0,
+      (sum, summary) => sum + summary.unsupportedGeometryCount,
+    );
+    final fidelityWarningCount = summaries.fold(
+      0,
+      (sum, summary) => sum + summary.fidelityWarningCount,
+    );
 
     showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(l10n.googleEarthImportResult),
+          title: Text(
+            isPartial
+                ? l10n.kmlImportPartialTitle
+                : l10n.googleEarthImportResult,
+          ),
           content: SizedBox(
             width: 560,
             child: SingleChildScrollView(
@@ -565,22 +642,43 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(l10n.googleEarthFilesImported(importedCount)),
+                  if (isPartial) ...[
+                    const SizedBox(height: 6),
+                    Text(l10n.kmlImportPartialNotice),
+                  ] else if (importedCount == 0) ...[
+                    const SizedBox(height: 6),
+                    Text(l10n.kmlNoLayersAdded),
+                  ],
                   if (skippedCount > 0) ...[
                     const SizedBox(height: 6),
                     Text(l10n.googleEarthFilesSkipped(skippedCount)),
                   ],
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.unreadableFiles,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  ...errors.map(
-                    (error) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Text('• $error'),
+                  if (summaries.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.kmlImportWarningsHeading,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(l10n.kmlImportedGeometryCount(importedGeometryCount)),
+                    Text(
+                      l10n.kmlMalformedGeometryCount(malformedGeometryCount),
+                    ),
+                    Text(
+                      l10n.kmlUnsupportedGeometryCount(
+                        unsupportedGeometryCount,
+                      ),
+                    ),
+                    Text(l10n.kmlFidelityWarningCount(fidelityWarningCount)),
+                    const SizedBox(height: 8),
+                    ...summaries
+                        .take(10)
+                        .map((summary) => _buildKmlSummary(context, summary)),
+                    if (summaries.length > 10)
+                      Text(
+                        l10n.kmlAdditionalSummaryItems(summaries.length - 10),
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -595,6 +693,48 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildKmlSummary(BuildContext context, _KmlImportFileSummary summary) {
+    final l10n = AppLocalizations.of(context);
+    final unsupportedEntries = summary.unsupportedGeometryCounts.entries
+        .take(5)
+        .toList();
+    final hiddenTypeCount =
+        summary.unsupportedGeometryCounts.length - unsupportedEntries.length;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.kmlDiagnosticFileHeading(summary.fileName),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          if (summary.isFatal)
+            Text(l10n.kmlFatalImportFailure(summary.fileName))
+          else ...[
+            Text(l10n.kmlImportedGeometryCount(summary.importedGeometryCount)),
+            Text(
+              l10n.kmlMalformedGeometryCount(summary.malformedGeometryCount),
+            ),
+            Text(
+              l10n.kmlUnsupportedGeometryCount(
+                summary.unsupportedGeometryCount,
+              ),
+            ),
+            Text(l10n.kmlFidelityWarningCount(summary.fidelityWarningCount)),
+            for (final entry in unsupportedEntries)
+              Text(
+                l10n.kmlUnsupportedGeometryTypeCount(entry.key, entry.value),
+              ),
+            if (hiddenTypeCount > 0)
+              Text(l10n.kmlAdditionalSummaryItems(hiddenTypeCount)),
+          ],
+        ],
+      ),
     );
   }
 
