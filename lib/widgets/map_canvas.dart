@@ -294,7 +294,9 @@ class _MapCanvasState extends State<MapCanvas> {
   bool _tryStartVertexEdit(Offset localPosition, Size canvasSize) {
     final selected = _selectedEntry?.displayFeature;
 
-    final snap = _findSnapAtPosition(localPosition, canvasSize);
+    final snap = selected == null
+        ? null
+        : _findSnapAtPosition(localPosition, canvasSize, targets: [selected]);
 
     if (selected == null || snap == null) {
       return false;
@@ -470,11 +472,12 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   void _updateVertexEdit(Offset localPosition, Size canvasSize) {
+    final activeEntry = _selectedEntry;
     final selected = _selectedEntry?.displayFeature;
 
     final coordinateIndex = _editingCoordinateIndex;
 
-    if (selected == null || coordinateIndex == null) {
+    if (activeEntry == null || selected == null || coordinateIndex == null) {
       return;
     }
 
@@ -494,6 +497,15 @@ class _MapCanvasState extends State<MapCanvas> {
       zoom: _zoom,
       pan: _pan,
     );
+    final effectiveScale = transform.scale * _zoom;
+    final snap = effectiveScale <= 0
+        ? null
+        : _snapService.findNearestSnap(
+            features: _vertexDragSnapTargets(activeEntry),
+            position: coordinate,
+            tolerance: _snapTolerancePixels / effectiveScale,
+          );
+    final effectiveCoordinate = snap?.coordinate ?? coordinate;
 
     final downPosition = _pointerDownPosition;
 
@@ -506,24 +518,33 @@ class _MapCanvasState extends State<MapCanvas> {
     final updated = selected.updateCoordinate(
       index: coordinateIndex,
       coordinate: MapCoordinate(
-        x: coordinate.x,
-        y: coordinate.y,
+        x: effectiveCoordinate.x,
+        y: effectiveCoordinate.y,
         z: currentVertex.z,
       ),
     );
 
     setState(() {
       _previewFeature = updated;
-      _mouseCoordinate = coordinate;
+      _mouseCoordinate = effectiveCoordinate;
 
-      _snapResult = MapSnapResult(
-        feature: updated,
-        coordinate: coordinate,
-        type: _snapTypeForCoordinate(updated, coordinateIndex),
-        distance: 0,
-        coordinateIndex: coordinateIndex,
-      );
+      _snapResult =
+          snap ??
+          MapSnapResult(
+            feature: updated,
+            coordinate: effectiveCoordinate,
+            type: _snapTypeForCoordinate(updated, coordinateIndex),
+            distance: 0,
+            coordinateIndex: coordinateIndex,
+          );
     });
+  }
+
+  List<MapFeature> _vertexDragSnapTargets(_DisplayFeatureEntry activeEntry) {
+    return _displayEntries
+        .where((entry) => !identical(entry, activeEntry))
+        .map((entry) => entry.displayFeature)
+        .toList();
   }
 
   MapSnapType _snapTypeForCoordinate(MapFeature feature, int index) {
@@ -682,7 +703,11 @@ class _MapCanvasState extends State<MapCanvas> {
     });
   }
 
-  MapSnapResult? _findSnapAtPosition(Offset localPosition, Size canvasSize) {
+  MapSnapResult? _findSnapAtPosition(
+    Offset localPosition,
+    Size canvasSize, {
+    List<MapFeature>? targets,
+  }) {
     final bounds = _calculateBounds(_displayFeatures);
 
     if (bounds == null) {
@@ -709,7 +734,7 @@ class _MapCanvasState extends State<MapCanvas> {
     final toleranceCad = _snapTolerancePixels / effectiveScale;
 
     return _snapService.findNearestSnap(
-      features: _displayFeatures,
+      features: targets ?? _displayFeatures,
       position: coordinate,
       tolerance: toleranceCad,
     );
