@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../models/coordinate_reference_system.dart';
 import '../models/map_feature.dart';
 import '../models/map_feature_change.dart';
 import '../models/map_project.dart';
+import '../services/canvas_coordinate_service.dart';
 import '../services/drawing_controller.dart';
 import '../services/feature_style_resolver.dart';
 import '../services/map_selection_service.dart';
@@ -32,6 +34,8 @@ class MapCanvas extends StatefulWidget {
 }
 
 class _MapCanvasState extends State<MapCanvas> {
+  final CanvasCoordinateService _canvasCoordinateService =
+      const CanvasCoordinateService();
   final MapSelectionService _selectionService = const MapSelectionService();
 
   final MapSnapService _snapService = const MapSnapService();
@@ -50,7 +54,7 @@ class _MapCanvasState extends State<MapCanvas> {
 
   MapCoordinate? _mouseCoordinate;
 
-  MapFeature? _selectedFeature;
+  _DisplayFeatureEntry? _selectedEntry;
   MapFeature? _previewFeature;
 
   MapSnapResult? _snapResult;
@@ -73,8 +77,10 @@ class _MapCanvasState extends State<MapCanvas> {
 
   int _featureIdSequence = 0;
 
+  late List<_DisplayFeatureEntry> _displayEntries;
+
   List<MapFeature> get _projectFeatures {
-    return widget.project.visibleFeatures;
+    return _displayEntries.map((entry) => entry.displayFeature).toList();
   }
 
   List<MapFeature> get _displayFeatures {
@@ -84,69 +90,100 @@ class _MapCanvasState extends State<MapCanvas> {
       return _projectFeatures;
     }
 
-    return _projectFeatures.map((feature) {
-      if (identical(feature, _selectedFeature)) {
-        return preview;
-      }
-
-      return feature;
+    return _displayEntries.map((entry) {
+      return identical(entry, _selectedEntry) ? preview : entry.displayFeature;
     }).toList();
   }
 
   MapFeature? get _displaySelectedFeature {
     final preview = _previewFeature;
 
-    if (preview != null && _selectedFeature != null) {
+    if (preview != null && _selectedEntry != null) {
       return preview;
     }
 
-    return _selectedFeature;
+    return _selectedEntry?.displayFeature;
   }
 
   bool _isFeatureLocked(MapFeature feature) {
-    for (final layer in widget.project.layers) {
-      final containsFeature = layer.features.any(
-        (item) => identical(item, feature),
-      );
+    return _entryForFeature(feature)?.locked ?? false;
+  }
 
-      if (containsFeature) {
-        return layer.locked;
+  @override
+  void initState() {
+    super.initState();
+    _displayEntries = _buildDisplayEntries();
+  }
+
+  List<_DisplayFeatureEntry> _buildDisplayEntries() {
+    final entries = <_DisplayFeatureEntry>[];
+    for (final layer in widget.project.visibleLayers) {
+      final occurrences = <String, int>{};
+      for (final sourceFeature in layer.features) {
+        final occurrence = occurrences.update(
+          sourceFeature.id,
+          (value) => value + 1,
+          ifAbsent: () => 0,
+        );
+        if (!sourceFeature.visible) continue;
+        final coordinates = <MapCoordinate>[];
+        var valid = true;
+        for (final coordinate in sourceFeature.coordinates) {
+          final result = _canvasCoordinateService.toCanvas(
+            coordinate: coordinate,
+            sourceCrs: layer.crs,
+            canvasCrs: widget.project.canvasCrs,
+          );
+          if (!result.isSuccess) {
+            valid = false;
+            break;
+          }
+          coordinates.add(result.coordinate!);
+        }
+        if (!valid) continue;
+        entries.add(
+          _DisplayFeatureEntry(
+            sourceLayerId: layer.id,
+            sourceFeatureId: sourceFeature.id,
+            sourceOccurrence: occurrence,
+            sourceCrs: layer.crs,
+            sourceFeature: sourceFeature,
+            displayFeature: sourceFeature.copyWith(coordinates: coordinates),
+            locked: layer.locked,
+          ),
+        );
       }
     }
+    return entries;
+  }
 
-    return false;
+  _DisplayFeatureEntry? _entryForFeature(MapFeature feature) {
+    if (identical(feature, _previewFeature)) return _selectedEntry;
+    for (final entry in _displayEntries) {
+      if (identical(feature, entry.displayFeature) ||
+          identical(feature, entry.sourceFeature)) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  _DisplayFeatureEntry? _entryForKey(_DisplayFeatureEntry key) {
+    for (final entry in _displayEntries) {
+      if (entry.hasSameSourceKey(key)) return entry;
+    }
+    return null;
   }
 
   @override
   void didUpdateWidget(covariant MapCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    final selected = _selectedFeature;
-
+    final selected = _selectedEntry;
+    _displayEntries = _buildDisplayEntries();
     if (selected != null && !_isEditingVertex && !_isMovingFeature) {
-      MapFeature? updatedFeature;
-
-      for (final feature in _projectFeatures) {
-        if (identical(feature, selected)) {
-          updatedFeature = feature;
-          break;
-        }
-      }
-
-      _selectedFeature = updatedFeature;
+      _selectedEntry = _entryForKey(selected);
     }
-
-    final snap = _snapResult;
-
-    if (snap != null) {
-      final stillExists = _projectFeatures.any(
-        (feature) => identical(feature, snap.feature),
-      );
-
-      if (!stillExists) {
-        _snapResult = null;
-      }
-    }
+    _snapResult = null;
   }
 
   void _fitView() {
@@ -255,7 +292,7 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   bool _tryStartVertexEdit(Offset localPosition, Size canvasSize) {
-    final selected = _selectedFeature;
+    final selected = _selectedEntry?.displayFeature;
 
     final snap = _findSnapAtPosition(localPosition, canvasSize);
 
@@ -293,7 +330,7 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   bool _tryStartFeatureMove(Offset localPosition, Size canvasSize) {
-    final selected = _selectedFeature;
+    final selected = _selectedEntry?.displayFeature;
 
     if (selected == null || _isFeatureLocked(selected)) {
       return false;
@@ -393,7 +430,7 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   void _updateFeatureMove(Offset localPosition, Size canvasSize) {
-    final selected = _selectedFeature;
+    final selected = _selectedEntry?.displayFeature;
     final start = _moveStartCoordinate;
 
     if (selected == null || start == null) {
@@ -433,7 +470,7 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   void _updateVertexEdit(Offset localPosition, Size canvasSize) {
-    final selected = _selectedFeature;
+    final selected = _selectedEntry?.displayFeature;
 
     final coordinateIndex = _editingCoordinateIndex;
 
@@ -465,9 +502,14 @@ class _MapCanvasState extends State<MapCanvas> {
       _pointerMoved = true;
     }
 
+    final currentVertex = selected.coordinates[coordinateIndex];
     final updated = selected.updateCoordinate(
       index: coordinateIndex,
-      coordinate: coordinate,
+      coordinate: MapCoordinate(
+        x: coordinate.x,
+        y: coordinate.y,
+        z: currentVertex.z,
+      ),
     );
 
     setState(() {
@@ -542,15 +584,14 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   void _finishFeatureMove(Offset localPosition, Size canvasSize) {
-    final original = _selectedFeature;
+    final entry = _selectedEntry;
     final preview = _previewFeature;
-    final changed = _pointerMoved && original != null && preview != null;
+    final updatedSource = entry == null || preview == null
+        ? null
+        : _sourceFeatureFromDisplay(entry, preview);
+    final changed = _pointerMoved && entry != null && updatedSource != null;
 
     setState(() {
-      if (changed) {
-        _selectedFeature = preview;
-      }
-
       _isMovingFeature = false;
       _moveStartCoordinate = null;
       _previewFeature = null;
@@ -561,7 +602,10 @@ class _MapCanvasState extends State<MapCanvas> {
 
     if (changed) {
       widget.onFeatureChanged?.call(
-        MapFeatureChange(originalFeature: original, updatedFeature: preview),
+        MapFeatureChange(
+          originalFeature: entry.sourceFeature,
+          updatedFeature: updatedSource,
+        ),
       );
     }
 
@@ -569,16 +613,37 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   void _finishVertexEdit(Offset localPosition, Size canvasSize) {
-    final original = _selectedFeature;
+    final entry = _selectedEntry;
     final preview = _previewFeature;
-
-    final changed = _pointerMoved && original != null && preview != null;
+    final coordinateIndex = _editingCoordinateIndex;
+    MapFeature? updatedSource;
+    if (entry != null &&
+        preview != null &&
+        coordinateIndex != null &&
+        coordinateIndex >= 0 &&
+        coordinateIndex < preview.coordinates.length) {
+      final result = _canvasCoordinateService.fromCanvas(
+        coordinate: preview.coordinates[coordinateIndex],
+        canvasCrs: widget.project.canvasCrs,
+        targetCrs: entry.sourceCrs,
+      );
+      if (result.isSuccess) {
+        final sourceCoordinate =
+            entry.sourceFeature.coordinates[coordinateIndex];
+        final transformed = result.coordinate!;
+        updatedSource = entry.sourceFeature.updateCoordinate(
+          index: coordinateIndex,
+          coordinate: MapCoordinate(
+            x: transformed.x,
+            y: transformed.y,
+            z: sourceCoordinate.z,
+          ),
+        );
+      }
+    }
+    final changed = _pointerMoved && entry != null && updatedSource != null;
 
     setState(() {
-      if (changed) {
-        _selectedFeature = preview;
-      }
-
       _isEditingVertex = false;
       _editingCoordinateIndex = null;
       _previewFeature = null;
@@ -589,7 +654,10 @@ class _MapCanvasState extends State<MapCanvas> {
 
     if (changed) {
       widget.onFeatureChanged?.call(
-        MapFeatureChange(originalFeature: original, updatedFeature: preview),
+        MapFeatureChange(
+          originalFeature: entry.sourceFeature,
+          updatedFeature: updatedSource,
+        ),
       );
     }
 
@@ -747,7 +815,7 @@ class _MapCanvasState extends State<MapCanvas> {
   void _startDrawing(DrawingMode mode) {
     setState(() {
       _drawingController.start(mode);
-      _selectedFeature = null;
+      _selectedEntry = null;
       _previewFeature = null;
       _snapResult = null;
       _isPanning = false;
@@ -812,12 +880,12 @@ class _MapCanvasState extends State<MapCanvas> {
     );
 
     setState(() {
-      _selectedFeature = result?.feature;
+      _selectedEntry = result == null ? null : _entryForFeature(result.feature);
     });
   }
 
   bool get _canAddVertex {
-    final feature = _selectedFeature;
+    final feature = _selectedEntry?.displayFeature;
     if (feature == null || _isFeatureLocked(feature)) {
       return false;
     }
@@ -827,7 +895,7 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   bool get _canDeleteVertex {
-    final feature = _selectedFeature;
+    final feature = _selectedEntry?.displayFeature;
     if (feature == null || _isFeatureLocked(feature)) {
       return false;
     }
@@ -844,37 +912,54 @@ class _MapCanvasState extends State<MapCanvas> {
   }
 
   bool get _canEditCoordinate {
-    final feature = _selectedFeature;
+    final feature = _selectedEntry?.displayFeature;
     return feature != null &&
         feature.coordinates.isNotEmpty &&
         !_isFeatureLocked(feature);
   }
 
-  void _commitFeatureUpdate(MapFeature updatedFeature) {
-    final original = _selectedFeature;
+  void _commitSourceFeatureUpdate(MapFeature updatedFeature) {
+    final entry = _selectedEntry;
 
-    if (original == null || _isFeatureLocked(original)) {
+    if (entry == null || entry.locked) {
       return;
     }
 
     setState(() {
-      _selectedFeature = updatedFeature;
       _previewFeature = null;
       _snapResult = null;
     });
 
     widget.onFeatureChanged?.call(
       MapFeatureChange(
-        originalFeature: original,
+        originalFeature: entry.sourceFeature,
         updatedFeature: updatedFeature,
       ),
     );
   }
 
-  Future<void> _showAddVertexDialog() async {
-    final feature = _selectedFeature;
+  MapFeature? _sourceFeatureFromDisplay(
+    _DisplayFeatureEntry entry,
+    MapFeature displayFeature,
+  ) {
+    final coordinates = <MapCoordinate>[];
+    for (final coordinate in displayFeature.coordinates) {
+      final result = _canvasCoordinateService.fromCanvas(
+        coordinate: coordinate,
+        canvasCrs: widget.project.canvasCrs,
+        targetCrs: entry.sourceCrs,
+      );
+      if (!result.isSuccess) return null;
+      coordinates.add(result.coordinate!);
+    }
+    return entry.sourceFeature.copyWith(coordinates: coordinates);
+  }
 
-    if (feature == null || !_canAddVertex) {
+  Future<void> _showAddVertexDialog() async {
+    final entry = _selectedEntry;
+    final feature = entry?.displayFeature;
+
+    if (entry == null || feature == null || !_canAddVertex) {
       return;
     }
 
@@ -1028,24 +1113,47 @@ class _MapCanvasState extends State<MapCanvas> {
       return;
     }
 
-    final originalZ = feature.coordinates[result.segmentIndex].z;
+    final segmentStart = feature.coordinates[result.segmentIndex];
+    final segmentEnd = feature
+        .coordinates[(result.segmentIndex + 1) % feature.coordinates.length];
+    final deltaX = segmentEnd.x - segmentStart.x;
+    final deltaY = segmentEnd.y - segmentStart.y;
+    final lengthSquared = deltaX * deltaX + deltaY * deltaY;
+    final t = lengthSquared > 0
+        ? (((result.coordinate.x - segmentStart.x) * deltaX +
+                      (result.coordinate.y - segmentStart.y) * deltaY) /
+                  lengthSquared)
+              .clamp(0.0, 1.0)
+              .toDouble()
+        : 0.0;
+    final startZ = segmentStart.z;
+    final endZ = segmentEnd.z;
+    final interpolatedZ = startZ != null && endZ != null
+        ? startZ + (endZ - startZ) * t
+        : startZ ?? endZ;
 
-    final coordinate = MapCoordinate(
+    final canvasCoordinate = MapCoordinate(
       x: result.coordinate.x,
       y: result.coordinate.y,
-      z: originalZ,
+      z: interpolatedZ,
     );
+    final sourceResult = _canvasCoordinateService.fromCanvas(
+      coordinate: canvasCoordinate,
+      canvasCrs: widget.project.canvasCrs,
+      targetCrs: entry.sourceCrs,
+    );
+    if (!sourceResult.isSuccess) return;
 
-    final updated = feature.insertCoordinate(
+    final updated = entry.sourceFeature.insertCoordinate(
       index: result.segmentIndex + 1,
-      coordinate: coordinate,
+      coordinate: sourceResult.coordinate!,
     );
 
-    _commitFeatureUpdate(updated);
+    _commitSourceFeatureUpdate(updated);
   }
 
   Future<void> _showDeleteVertexDialog() async {
-    final feature = _selectedFeature;
+    final feature = _selectedEntry?.sourceFeature;
 
     if (feature == null || !_canDeleteVertex) {
       return;
@@ -1131,11 +1239,11 @@ class _MapCanvasState extends State<MapCanvas> {
 
     final updated = feature.removeCoordinate(result);
 
-    _commitFeatureUpdate(updated);
+    _commitSourceFeatureUpdate(updated);
   }
 
   Future<void> _showCoordinateEditorDialog() async {
-    final feature = _selectedFeature;
+    final feature = _selectedEntry?.sourceFeature;
 
     if (feature == null || !_canEditCoordinate) {
       return;
@@ -1271,7 +1379,7 @@ class _MapCanvasState extends State<MapCanvas> {
       coordinate: MapCoordinate(x: result.x, y: result.y, z: oldCoordinate.z),
     );
 
-    _commitFeatureUpdate(updated);
+    _commitSourceFeatureUpdate(updated);
   }
 
   void _clearPointerState() {
@@ -2220,6 +2328,32 @@ class _MapProjectPainter extends CustomPainter {
     return oldDelegate.features != features ||
         oldDelegate.zoom != zoom ||
         oldDelegate.pan != pan;
+  }
+}
+
+class _DisplayFeatureEntry {
+  final String sourceLayerId;
+  final String sourceFeatureId;
+  final int sourceOccurrence;
+  final CoordinateReferenceSystem sourceCrs;
+  final MapFeature sourceFeature;
+  final MapFeature displayFeature;
+  final bool locked;
+
+  const _DisplayFeatureEntry({
+    required this.sourceLayerId,
+    required this.sourceFeatureId,
+    required this.sourceOccurrence,
+    required this.sourceCrs,
+    required this.sourceFeature,
+    required this.displayFeature,
+    required this.locked,
+  });
+
+  bool hasSameSourceKey(_DisplayFeatureEntry other) {
+    return sourceLayerId == other.sourceLayerId &&
+        sourceFeatureId == other.sourceFeatureId &&
+        sourceOccurrence == other.sourceOccurrence;
   }
 }
 
