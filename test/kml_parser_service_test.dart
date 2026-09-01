@@ -456,6 +456,166 @@ void main() {
     });
   });
 
+  group('KML shared Style and StyleMap resolution', () {
+    test(
+      'resolves styles before and after placemarks with namespace-safe colors',
+      () {
+        const kml = '''
+<k:kml xmlns:k="http://www.opengis.net/kml/2.2"><k:Document>
+<k:Style id="before"><k:LineStyle><k:color>800000ff</k:color><k:width>2.5</k:width></k:LineStyle></k:Style>
+<k:Placemark><k:styleUrl>#before</k:styleUrl><k:LineString><k:coordinates>106,16 107,17</k:coordinates></k:LineString></k:Placemark>
+<k:Placemark><k:styleUrl>#after</k:styleUrl><k:Polygon><k:outerBoundaryIs><k:LinearRing><k:coordinates>0,0 1,0 1,1 0,0</k:coordinates></k:LinearRing></k:outerBoundaryIs></k:Polygon></k:Placemark>
+<k:Style id="after"><k:PolyStyle><k:color>4000ff00</k:color><k:fill>0</k:fill><k:outline>1</k:outline></k:PolyStyle></k:Style>
+</k:Document></k:kml>
+''';
+
+        final result = service.parseString(kml);
+        final line = result.features[0].properties;
+        final polygon = result.features[1].properties;
+
+        expect(line['kml.styleUrl'], '#before');
+        expect(line['style.strokeColor'], '#FF0000');
+        expect(line['style.strokeOpacity'], '0.501961');
+        expect(line['style.strokeWidth'], '2.5');
+        expect(polygon['kml.styleUrl'], '#after');
+        expect(polygon['style.fillColor'], '#00FF00');
+        expect(polygon['style.fillOpacity'], '0.25098');
+        expect(polygon['style.fill'], '0');
+        expect(polygon['style.outline'], '1');
+        expect(result.diagnostics.hasIssues, isFalse);
+      },
+    );
+
+    test('inline style overrides referenced canonical keys only', () {
+      const kml = '''
+<kml><Document>
+<Style id="road"><LineStyle><color>ff0000ff</color><width>2</width></LineStyle></Style>
+<Placemark><styleUrl>#road</styleUrl>
+<ExtendedData>
+<Data name="style.strokeColor"><value>#00FF00</value></Data>
+<Data name="owner"><value>Đội khảo sát – ທີມສຳຫຼວດ</value></Data>
+</ExtendedData>
+<Style><LineStyle><width>5</width></LineStyle></Style>
+<LineString><coordinates>106,16 107,17</coordinates></LineString>
+</Placemark></Document></kml>
+''';
+
+      final properties = service.parseString(kml).features.single.properties;
+
+      expect(properties['style.strokeColor'], '#FF0000');
+      expect(properties['style.strokeWidth'], '5');
+      expect(properties['owner'], 'Đội khảo sát – ທີມສຳຫຼວດ');
+      expect(properties['kml.styleUrl'], '#road');
+    });
+
+    test(
+      'StyleMap normal wins over highlight and supports inline and chains',
+      () {
+        const kml = '''
+<kml><Document>
+<Style id="red"><LineStyle><color>ff0000ff</color></LineStyle></Style>
+<Style id="blue"><LineStyle><color>ffff0000</color></LineStyle></Style>
+<StyleMap id="normalMap">
+  <Pair><key>normal</key><styleUrl>#red</styleUrl></Pair>
+  <Pair><key>highlight</key><styleUrl>#blue</styleUrl></Pair>
+</StyleMap>
+<StyleMap id="inlineMap"><Pair><key>normal</key><Style><LineStyle><width>4</width></LineStyle></Style></Pair></StyleMap>
+<StyleMap id="chainMap"><Pair><key>normal</key><styleUrl>#normalMap</styleUrl></Pair></StyleMap>
+<Placemark><styleUrl>#normalMap</styleUrl><Point><coordinates>1,1</coordinates></Point></Placemark>
+<Placemark><styleUrl>#inlineMap</styleUrl><Point><coordinates>2,2</coordinates></Point></Placemark>
+<Placemark><styleUrl>#chainMap</styleUrl><Point><coordinates>3,3</coordinates></Point></Placemark>
+</Document></kml>
+''';
+
+        final result = service.parseString(kml);
+
+        expect(result.features[0].properties['style.strokeColor'], '#FF0000');
+        expect(result.features[1].properties['style.strokeWidth'], '4');
+        expect(result.features[2].properties['style.strokeColor'], '#FF0000');
+        expect(result.diagnostics.hasIssues, isFalse);
+      },
+    );
+
+    test('missing external malformed and duplicate references warn without resolution', () {
+      const kml = '''
+<kml><Document>
+<Style id="duplicate"><LineStyle><color>ff0000ff</color></LineStyle></Style>
+<Style id="duplicate"><LineStyle><color>ffff0000</color></LineStyle></Style>
+<Placemark><styleUrl>#missing</styleUrl><Point><coordinates>1,1</coordinates></Point></Placemark>
+<Placemark><styleUrl>other.kml#road</styleUrl><Point><coordinates>2,2</coordinates></Point></Placemark>
+<Placemark><styleUrl>#bad id</styleUrl><Point><coordinates>3,3</coordinates></Point></Placemark>
+<Placemark><styleUrl>#duplicate</styleUrl><Point><coordinates>4,4</coordinates></Point></Placemark>
+</Document></kml>
+''';
+
+      final result = service.parseString(kml);
+
+      expect(
+        result.features.map((feature) => feature.properties['kml.styleUrl']),
+        ['#missing', 'other.kml#road', '#bad id', '#duplicate'],
+      );
+      for (final feature in result.features) {
+        expect(feature.properties.containsKey('style.strokeColor'), isFalse);
+      }
+      expect(result.diagnostics.issues, hasLength(4));
+      expect(
+        result.diagnostics.issues.map((issue) => issue.code),
+        everyElement(KmlDiagnosticCode.fidelityWarning),
+      );
+    });
+
+    test(
+      'cycles and highlight-only StyleMap warn without recursion or fallback',
+      () {
+        const kml = '''
+<kml><Document>
+<Style id="blue"><LineStyle><color>ffff0000</color></LineStyle></Style>
+<StyleMap id="self"><Pair><key>normal</key><styleUrl>#self</styleUrl></Pair></StyleMap>
+<StyleMap id="a"><Pair><key>normal</key><styleUrl>#b</styleUrl></Pair></StyleMap>
+<StyleMap id="b"><Pair><key>normal</key><styleUrl>#a</styleUrl></Pair></StyleMap>
+<StyleMap id="highlightOnly"><Pair><key>highlight</key><styleUrl>#blue</styleUrl></Pair></StyleMap>
+<Placemark><styleUrl>#self</styleUrl><Point><coordinates>1,1</coordinates></Point></Placemark>
+<Placemark><styleUrl>#a</styleUrl><Point><coordinates>2,2</coordinates></Point></Placemark>
+<Placemark><styleUrl>#highlightOnly</styleUrl><Point><coordinates>3,3</coordinates></Point></Placemark>
+</Document></kml>
+''';
+
+        final result = service.parseString(kml);
+
+        expect(result.features, hasLength(3));
+        for (final feature in result.features) {
+          expect(feature.properties.containsKey('style.strokeColor'), isFalse);
+        }
+        expect(result.diagnostics.issues, hasLength(3));
+        expect(result.diagnostics.hasFidelityWarnings, isTrue);
+      },
+    );
+
+    test('excessive StyleMap chain stops at the defensive depth limit', () {
+      final definitions = StringBuffer();
+      for (var index = 0; index < 33; index++) {
+        definitions.write(
+          '<StyleMap id="m$index"><Pair><key>normal</key><styleUrl>#m${index + 1}</styleUrl></Pair></StyleMap>',
+        );
+      }
+      definitions.write(
+        '<Style id="m33"><LineStyle><color>ff0000ff</color></LineStyle></Style>',
+      );
+      final result = service.parseString(
+        '<kml><Document>$definitions<Placemark><styleUrl>#m0</styleUrl><Point><coordinates>1,1</coordinates></Point></Placemark></Document></kml>',
+      );
+
+      expect(
+        result.features.single.properties.containsKey('style.strokeColor'),
+        isFalse,
+      );
+      expect(
+        result.diagnostics.issues.single.code,
+        KmlDiagnosticCode.fidelityWarning,
+      );
+    });
+  });
+
   test('structurally invalid XML remains a whole-document failure', () {
     expect(
       () => service.parseString('<kml><Placemark>'),

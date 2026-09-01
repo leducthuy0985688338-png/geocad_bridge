@@ -426,6 +426,29 @@ void main() {
       );
     });
 
+    test('shared-style import exports resolved visual style inline', () {
+      const source = '''
+<kml><Document>
+<Style id="road"><LineStyle><color>800000ff</color><width>2</width></LineStyle></Style>
+<Placemark><styleUrl>#road</styleUrl><LineString><coordinates>106,16 107,17</coordinates></LineString></Placemark>
+</Document></kml>
+''';
+      final imported = const KmlParserService().parseString(source);
+
+      final document = exportFeature(imported.features.single);
+      final placemark = document.findAllElements('Placemark').single;
+      final lineStyle = placemark.findAllElements('LineStyle').single;
+
+      expect(placemark.findElements('styleUrl').single.innerText, '#road');
+      expect(lineStyle.findElements('color').single.innerText, '800000ff');
+      expect(lineStyle.findElements('width').single.innerText, '2');
+      expect(document.findAllElements('Style').length, 1);
+      expect(
+        document.findAllElements('Style').single.getAttribute('id'),
+        isNull,
+      );
+    });
+
     test('does not expose style keys as ExtendedData and preserves Unicode metadata', () {
       const feature = MapFeature(
         id: 'style-metadata',

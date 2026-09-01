@@ -8,6 +8,7 @@ import 'package:autocad_googleearth/models/map_feature.dart';
 import 'package:autocad_googleearth/models/map_layer.dart';
 import 'package:autocad_googleearth/models/map_project.dart';
 import 'package:autocad_googleearth/services/layer_georeference_service.dart';
+import 'package:autocad_googleearth/services/kml_parser_service.dart';
 import 'package:autocad_googleearth/services/project_persistence_service.dart';
 
 void main() {
@@ -126,6 +127,46 @@ void main() {
     expect(restored.project.layers, isEmpty);
     expect(restored.project.canvasCrs.isLocalCad, isTrue);
   });
+
+  test(
+    'resolved KML shared style and raw styleUrl survive project round-trip',
+    () {
+      const kml = '''
+<kml><Document>
+<Style id="road"><LineStyle><color>800000ff</color><width>2</width></LineStyle></Style>
+<Placemark><styleUrl>#road</styleUrl><LineString><coordinates>106,16 107,17</coordinates></LineString></Placemark>
+</Document></kml>
+''';
+      final imported = const KmlParserService()
+          .parseString(kml)
+          .features
+          .single;
+      final source = document(
+        MapProject(
+          id: 'shared-style',
+          name: 'Shared style',
+          layers: [
+            MapLayer(
+              id: 'kml-layer',
+              name: 'KML',
+              sourceType: MapLayerSourceType.kml,
+              crs: const CoordinateReferenceSystem.wgs84(),
+              features: [imported],
+            ),
+          ],
+        ),
+      );
+
+      final restored = service.deserialize(service.serialize(source));
+      final properties =
+          restored.project.layers.single.features.single.properties;
+
+      expect(properties['kml.styleUrl'], '#road');
+      expect(properties['style.strokeColor'], '#FF0000');
+      expect(properties['style.strokeOpacity'], '0.501961');
+      expect(properties['style.strokeWidth'], '2');
+    },
+  );
 
   test('project canvas CRS round-trips for WGS84 and UTM', () {
     const projects = [

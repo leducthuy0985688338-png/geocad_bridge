@@ -98,6 +98,7 @@ class KmlParserService {
     'relativeToGround',
     'absolute',
   };
+  static const _maximumStyleResolutionDepth = 32;
 
   Future<KmlParseResult> parseFile(String path) async {
     final file = File(path);
@@ -122,6 +123,7 @@ class KmlParserService {
     final features = <MapFeature>[];
     final issues = <KmlImportDiagnostic>[];
     final unsupportedGeometryCounts = <String, int>{};
+    final sharedStyleIndex = _buildSharedStyleIndex(document);
     var placemarkCount = 0;
     var pointCount = 0;
     var lineStringCount = 0;
@@ -140,7 +142,14 @@ class KmlParserService {
       final name = _firstChildText(placemark, 'name') ?? '';
       final description = _firstChildText(placemark, 'description');
       final baseProperties = _readExtendedData(placemark);
-      _readPlacemarkStyle(placemark, baseProperties);
+      _readPlacemarkStyle(
+        placemark,
+        baseProperties,
+        sharedStyleIndex: sharedStyleIndex,
+        placemarkIndex: placemarkCount,
+        placemarkName: name,
+        issues: issues,
+      );
       final geometryEntries = _geometryEntries(placemark);
 
       for (final entry in geometryEntries) {
@@ -562,17 +571,186 @@ class KmlParserService {
     );
   }
 
+  _KmlSharedStyleIndex _buildSharedStyleIndex(XmlDocument document) {
+    final index = _KmlSharedStyleIndex();
+
+    void collect(
+      XmlNode parent, {
+      required bool insidePlacemark,
+      required bool insideStyleSelector,
+    }) {
+      for (final element in parent.children.whereType<XmlElement>()) {
+        final localName = element.name.local;
+        final childInsidePlacemark =
+            insidePlacemark || localName == 'Placemark';
+        final isStyleSelector = localName == 'Style' || localName == 'StyleMap';
+
+        if (!childInsidePlacemark && !insideStyleSelector && isStyleSelector) {
+          final id = element.getAttribute('id')?.trim();
+          if (id != null && id.isNotEmpty) {
+            index.add(id, element);
+          }
+        }
+
+        collect(
+          element,
+          insidePlacemark: childInsidePlacemark,
+          insideStyleSelector: insideStyleSelector || isStyleSelector,
+        );
+      }
+    }
+
+    collect(document, insidePlacemark: false, insideStyleSelector: false);
+    return index;
+  }
+
+  _KmlStyleResolution _resolveStyleReference(
+    String rawReference,
+    _KmlSharedStyleIndex index, {
+    required Set<String> visitedIds,
+    required int depth,
+  }) {
+    if (!rawReference.startsWith('#')) {
+      return _KmlStyleResolution.failure(
+        'Style reference "$rawReference" là external hoặc không phải local reference và chưa được resolve.',
+      );
+    }
+
+    final id = rawReference.substring(1);
+    if (id.isEmpty || !RegExp(r'^[^\s#]+$').hasMatch(id)) {
+      return _KmlStyleResolution.failure(
+        'Style reference "$rawReference" không hợp lệ.',
+      );
+    }
+
+    return _resolveSharedStyle(id, index, visitedIds: visitedIds, depth: depth);
+  }
+
+  _KmlStyleResolution _resolveSharedStyle(
+    String id,
+    _KmlSharedStyleIndex index, {
+    required Set<String> visitedIds,
+    required int depth,
+  }) {
+    if (depth >= _maximumStyleResolutionDepth) {
+      return const _KmlStyleResolution.failure(
+        'Style reference chain vượt quá giới hạn an toàn.',
+      );
+    }
+    if (!visitedIds.add(id)) {
+      return _KmlStyleResolution.failure(
+        'Style reference cycle được phát hiện tại "$id".',
+      );
+    }
+    if (index.ambiguousIds.contains(id)) {
+      return _KmlStyleResolution.failure(
+        'Style ID "$id" bị trùng và không thể resolve an toàn.',
+      );
+    }
+
+    final definition = index.definitions[id];
+    if (definition == null) {
+      return _KmlStyleResolution.failure(
+        'Không tìm thấy shared Style ID "$id".',
+      );
+    }
+
+    if (definition.name.local == 'Style') {
+      final properties = _readCanonicalStyle(definition);
+      if (properties.isEmpty) {
+        return _KmlStyleResolution.failure(
+          'Shared Style "$id" không có style canonical hợp lệ.',
+        );
+      }
+      return _KmlStyleResolution.success(properties);
+    }
+
+    final normalPairs = definition.children
+        .whereType<XmlElement>()
+        .where(
+          (element) =>
+              element.name.local == 'Pair' &&
+              _firstChildText(element, 'key') == 'normal',
+        )
+        .toList();
+    if (normalPairs.length != 1) {
+      return _KmlStyleResolution.failure(
+        'StyleMap "$id" phải có đúng một Pair normal.',
+      );
+    }
+
+    final normalPair = normalPairs.single;
+    final inlineStyle = _firstDirectChild(normalPair, 'Style');
+    final nestedReference = _firstChildText(normalPair, 'styleUrl');
+    if (inlineStyle != null && nestedReference != null) {
+      return _KmlStyleResolution.failure(
+        'StyleMap "$id" có Pair normal không rõ ràng.',
+      );
+    }
+    if (inlineStyle != null) {
+      final properties = _readCanonicalStyle(inlineStyle);
+      if (properties.isEmpty) {
+        return _KmlStyleResolution.failure(
+          'StyleMap "$id" có Pair normal không hợp lệ.',
+        );
+      }
+      return _KmlStyleResolution.success(properties);
+    }
+    if (nestedReference == null) {
+      return _KmlStyleResolution.failure(
+        'StyleMap "$id" có Pair normal thiếu Style/styleUrl.',
+      );
+    }
+
+    return _resolveStyleReference(
+      nestedReference,
+      index,
+      visitedIds: visitedIds,
+      depth: depth + 1,
+    );
+  }
+
   void _readPlacemarkStyle(
     XmlElement placemark,
-    Map<String, String> properties,
-  ) {
+    Map<String, String> properties, {
+    required _KmlSharedStyleIndex sharedStyleIndex,
+    required int placemarkIndex,
+    required String placemarkName,
+    required List<KmlImportDiagnostic> issues,
+  }) {
     final styleUrl = _firstChildText(placemark, 'styleUrl');
     if (styleUrl != null) {
       properties['kml.styleUrl'] = styleUrl;
+      final resolution = _resolveStyleReference(
+        styleUrl,
+        sharedStyleIndex,
+        visitedIds: <String>{},
+        depth: 0,
+      );
+      if (resolution.isSuccess) {
+        properties.addAll(resolution.properties);
+      } else {
+        issues.add(
+          KmlImportDiagnostic(
+            severity: KmlDiagnosticSeverity.warning,
+            code: KmlDiagnosticCode.fidelityWarning,
+            placemarkIndex: placemarkIndex,
+            placemarkName: placemarkName,
+            geometryType: 'Style',
+            message: resolution.message!,
+          ),
+        );
+      }
     }
 
     final style = _firstDirectChild(placemark, 'Style');
     if (style == null) return;
+
+    properties.addAll(_readCanonicalStyle(style));
+  }
+
+  Map<String, String> _readCanonicalStyle(XmlElement style) {
+    final properties = <String, String>{};
 
     final lineStyle = _firstDirectChild(style, 'LineStyle');
     if (lineStyle != null) {
@@ -617,6 +795,8 @@ class KmlParserService {
         properties['style.outline'] = outline!;
       }
     }
+
+    return properties;
   }
 
   void _readKmlColor(
@@ -697,6 +877,34 @@ class KmlParserService {
     }
     return null;
   }
+}
+
+class _KmlSharedStyleIndex {
+  final Map<String, XmlElement> definitions = <String, XmlElement>{};
+  final Set<String> ambiguousIds = <String>{};
+
+  void add(String id, XmlElement definition) {
+    if (ambiguousIds.contains(id)) return;
+    if (definitions.remove(id) != null) {
+      ambiguousIds.add(id);
+      return;
+    }
+    definitions[id] = definition;
+  }
+}
+
+class _KmlStyleResolution {
+  final Map<String, String> properties;
+  final String? message;
+
+  const _KmlStyleResolution.failure(String this.message)
+    : properties = const {};
+
+  _KmlStyleResolution.success(Map<String, String> properties)
+    : properties = Map.unmodifiable(properties),
+      message = null;
+
+  bool get isSuccess => message == null;
 }
 
 class _KmlGeometryEntry {
