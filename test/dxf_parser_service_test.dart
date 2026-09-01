@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -49,6 +50,14 @@ EOF
       '${tempDirectory.path}${Platform.pathSeparator}raw-${fileIndex++}.dxf',
     );
     await file.writeAsString(content);
+    return service.parseFile(file.path);
+  }
+
+  Future<DxfParseResult> parseBytes(List<int> bytes) async {
+    final file = File(
+      '${tempDirectory.path}${Platform.pathSeparator}bytes-${fileIndex++}.dxf',
+    );
+    await file.writeAsBytes(bytes);
     return service.parseFile(file.path);
   }
 
@@ -478,6 +487,149 @@ CLOSED
       parseRaw('bad\nSECTION\n'),
       throwsA(isA<DxfParserException>()),
     );
+  });
+
+  group('DXF strict UTF-8 import boundary', () {
+    const asciiDxf =
+        '0\nSECTION\n2\nENTITIES\n0\nPOINT\n10\n1\n20\n2\n0\nENDSEC\n0\nEOF\n';
+
+    test('parses ASCII bytes with LF and CRLF line endings', () async {
+      final lf = await parseBytes(ascii.encode(asciiDxf));
+      final crlf = await parseBytes(
+        ascii.encode(asciiDxf.replaceAll('\n', '\r\n')),
+      );
+
+      for (final result in [lf, crlf]) {
+        expect(result.features.single.type, MapFeatureType.point);
+        expect(result.features.single.coordinates.single.x, 1);
+        expect(result.features.single.coordinates.single.y, 2);
+      }
+    });
+
+    test('parses valid UTF-8 Vietnamese Lao and mixed TEXT bytes', () async {
+      for (final label in const [
+        'Điểm khảo sát',
+        'ຈຸດສຳຫຼວດ',
+        'Điểm khảo sát – ຈຸດສຳຫຼວດ – Survey point',
+      ]) {
+        final dxf =
+            '0\nSECTION\n2\nENTITIES\n0\nTEXT\n8\nUNICODE\n'
+            '10\n1\n20\n2\n1\n$label\n0\nENDSEC\n0\nEOF\n';
+        final result = await parseBytes(utf8.encode(dxf));
+
+        expect(result.features.single.name, label);
+        expect(result.features.single.properties['cadLayer'], 'UNICODE');
+      }
+    });
+
+    test('accepts UTF-8 BOM without corrupting the first group code', () async {
+      final bytes = <int>[0xEF, 0xBB, 0xBF, ...utf8.encode(asciiDxf)];
+      final result = await parseBytes(bytes);
+
+      expect(result.pairs.first.code, 0);
+      expect(result.pairs.first.value, 'SECTION');
+      expect(result.features.single.type, MapFeatureType.point);
+    });
+
+    test('rejects malformed UTF-8 as DxfParserException', () async {
+      final bytes = <int>[
+        ...ascii.encode('0\nSECTION\n2\nENTITIES\n0\nTEXT\n10\n1\n20\n2\n1\n'),
+        0xC3,
+        0x28,
+        ...ascii.encode('\n0\nENDSEC\n0\nEOF\n'),
+      ];
+
+      await expectLater(
+        parseBytes(bytes),
+        throwsA(
+          isA<DxfParserException>().having(
+            (error) => error.message,
+            'message',
+            contains('UTF-8'),
+          ),
+        ),
+      );
+    });
+
+    test(
+      'rejects representative legacy single-byte text deterministically',
+      () async {
+        final bytes = <int>[
+          ...ascii.encode(
+            '0\nSECTION\n2\nENTITIES\n0\nTEXT\n10\n1\n20\n2\n1\nCaf',
+          ),
+          0xE9,
+          ...ascii.encode('\n0\nENDSEC\n0\nEOF\n'),
+        ];
+
+        Object? caught;
+        try {
+          await parseBytes(bytes);
+        } catch (error) {
+          caught = error;
+        }
+        expect(caught, isA<DxfParserException>());
+        expect(caught, isNot(isA<FormatException>()));
+        expect(caught.toString(), isNot(contains('Caf')));
+      },
+    );
+
+    test('preserves Unicode layer lookup through byte decoding', () async {
+      const layerName = 'Đường tưới – ສາຍຊົລະປະທານ';
+      const dxf =
+          '''
+0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LAYER
+70
+1
+0
+LAYER
+2
+$layerName
+70
+0
+62
+3
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+LINE
+8
+$layerName
+62
+256
+10
+0
+20
+0
+11
+1
+21
+1
+0
+ENDSEC
+0
+EOF
+''';
+      final result = await parseBytes(utf8.encode(dxf));
+      final properties = result.features.single.properties;
+
+      expect(properties['cadLayer'], layerName);
+      expect(properties['cad.layer.colorIndex'], '3');
+      expect(properties['style.strokeColor'], '#00FF00');
+    });
   });
 
   test('skips NaN POINT and Infinity LINE with diagnostics', () async {

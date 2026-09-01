@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -26,7 +27,16 @@ class DxfParserService {
       throw const DxfParserException('Không tìm thấy file DXF.');
     }
 
-    final lines = await file.readAsLines();
+    final bytes = await file.readAsBytes();
+    late final String content;
+    try {
+      content = utf8.decode(bytes);
+    } on FormatException {
+      throw const DxfParserException(
+        'File DXF không phải UTF-8 hợp lệ hoặc dùng encoding chưa được hỗ trợ.',
+      );
+    }
+    final lines = const LineSplitter().convert(content);
 
     if (lines.isEmpty) {
       throw const DxfParserException('File DXF không có dữ liệu.');
