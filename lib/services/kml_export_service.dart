@@ -376,9 +376,11 @@ class KmlExportService {
   }
 
   String _coordinateTuple(MapCoordinate coordinate) {
-    return '${_formatNumber(coordinate.x)},'
-        '${_formatNumber(coordinate.y)},'
-        '${_formatNumber(coordinate.z ?? 0)}';
+    final horizontal =
+        '${_formatNumber(coordinate.x)},'
+        '${_formatNumber(coordinate.y)}';
+    final z = coordinate.z;
+    return z == null ? horizontal : '$horizontal,${_formatNumber(z)}';
   }
 
   String _formatNumber(double value) {

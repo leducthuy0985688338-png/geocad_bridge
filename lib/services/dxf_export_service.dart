@@ -282,7 +282,6 @@ class DxfExportService {
           xCode: 10,
           yCode: 20,
           zCode: 30,
-          writeZeroZ: true,
         );
       case MapFeatureType.line:
         _requireCount(layer, feature, exactly: 2);
@@ -293,7 +292,6 @@ class DxfExportService {
           xCode: 10,
           yCode: 20,
           zCode: 30,
-          writeZeroZ: true,
         );
         _coordinate(
           lines,
@@ -301,7 +299,6 @@ class DxfExportService {
           xCode: 11,
           yCode: 21,
           zCode: 31,
-          writeZeroZ: true,
         );
       case MapFeatureType.polyline:
         _requireCount(layer, feature, minimum: 2);
@@ -442,7 +439,6 @@ class DxfExportService {
       xCode: 10,
       yCode: 20,
       zCode: 30,
-      writeZeroZ: true,
     );
     _pair(lines, 40, _number(height));
     _pair(lines, 1, content);
@@ -619,12 +615,11 @@ class DxfExportService {
     required int xCode,
     required int yCode,
     required int zCode,
-    bool writeZeroZ = false,
   }) {
     _pair(lines, xCode, _number(coordinate.x));
     _pair(lines, yCode, _number(coordinate.y));
-    if (coordinate.z != null || writeZeroZ) {
-      _pair(lines, zCode, _number(coordinate.z ?? 0));
+    if (coordinate.z != null) {
+      _pair(lines, zCode, _number(coordinate.z!));
     }
   }
 

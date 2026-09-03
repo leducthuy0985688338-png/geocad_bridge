@@ -751,4 +751,67 @@ EOF
 
     expect(reparsedKml.diagnostics.hasIssues, isFalse);
   });
+
+  test('DXF missing Z stays absent when exported to KML', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'geocad-dxf-kml-z-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File(
+      '${directory.path}${Platform.pathSeparator}missing-z.dxf',
+    );
+    await file.writeAsString(
+      '0\nSECTION\n2\nENTITIES\n0\nPOINT\n10\n106\n20\n16\n'
+      '0\nENDSEC\n0\nEOF\n',
+    );
+    final imported = await const DxfParserService().parseFile(file.path);
+    expect(imported.features.single.coordinates.single.z, isNull);
+
+    final kml = const KmlExportService().exportLayers(
+      documentName: 'Missing Z',
+      layers: [
+        MapLayer(
+          id: 'wgs84',
+          name: 'WGS84',
+          sourceType: MapLayerSourceType.dxf,
+          crs: const CoordinateReferenceSystem.wgs84(),
+          features: imported.features,
+        ),
+      ],
+    );
+
+    final reparsed = const KmlParserService().parseString(kml);
+    expect(reparsed.features.single.coordinates.single.z, isNull);
+  });
+
+  test('KML missing altitude stays absent when exported to DXF', () async {
+    final imported = const KmlParserService().parseString(
+      '<kml><Placemark><Point><coordinates>1,2</coordinates>'
+      '</Point></Placemark></kml>',
+    );
+    expect(imported.features.single.coordinates.single.z, isNull);
+
+    final exported = const DxfExportService().serialize(
+      documentName: 'Missing Z',
+      layers: [
+        MapLayer(
+          id: 'local',
+          name: 'Local',
+          sourceType: MapLayerSourceType.kml,
+          features: imported.features,
+        ),
+      ],
+    );
+    final directory = await Directory.systemTemp.createTemp(
+      'geocad-kml-dxf-z-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File(
+      '${directory.path}${Platform.pathSeparator}missing-z.dxf',
+    );
+    await file.writeAsBytes(exported.bytes);
+
+    final reparsed = await const DxfParserService().parseFile(file.path);
+    expect(reparsed.features.single.coordinates.single.z, isNull);
+  });
 }

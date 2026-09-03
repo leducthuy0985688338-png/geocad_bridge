@@ -55,6 +55,31 @@ void main() {
     expect(point.findElements('altitudeMode').single.innerText, 'absolute');
   });
 
+  test('preserves Point null zero positive and negative altitude presence', () {
+    const cases = [
+      (z: null, tuple: '106.000000000000,16.0000000000000'),
+      (z: 0.0, tuple: '106.000000000000,16.0000000000000,0'),
+      (z: 25.5, tuple: '106.000000000000,16.0000000000000,25.5000000000000'),
+      (z: -12.5, tuple: '106.000000000000,16.0000000000000,-12.5000000000000'),
+    ];
+    const parser = KmlParserService();
+
+    for (final testCase in cases) {
+      final document = exportFeature(
+        MapFeature(
+          id: 'point-${testCase.z}',
+          type: MapFeatureType.point,
+          coordinates: [MapCoordinate(x: 106, y: 16, z: testCase.z)],
+        ),
+      );
+      final tuple = document.findAllElements('coordinates').single.innerText;
+      final reparsed = parser.parseString(document.toXmlString());
+
+      expect(tuple, testCase.tuple);
+      expect(reparsed.features.single.coordinates.single.z, testCase.z);
+    }
+  });
+
   test('exports Polyline as KML LineString', () {
     final document = exportFeature(
       const MapFeature(
@@ -77,8 +102,40 @@ void main() {
         .split(' ');
 
     expect(tuples, hasLength(3));
-    expect(tuples.first, '106.000000000000,16.0000000000000,0');
-    expect(tuples.last, '106.200000000000,16.2000000000000,0');
+    expect(tuples.first, '106.000000000000,16.0000000000000');
+    expect(tuples.last, '106.200000000000,16.2000000000000');
+  });
+
+  test('mixed-dimensional LineString preserves Z per coordinate', () {
+    final document = exportFeature(
+      const MapFeature(
+        id: 'mixed-line',
+        type: MapFeatureType.polyline,
+        coordinates: [
+          MapCoordinate(x: 106, y: 16),
+          MapCoordinate(x: 107, y: 17, z: 0),
+          MapCoordinate(x: 108, y: 18, z: -12.5),
+        ],
+      ),
+    );
+    final tuples = document
+        .findAllElements('coordinates')
+        .single
+        .innerText
+        .split(' ');
+
+    expect(tuples, [
+      '106.000000000000,16.0000000000000',
+      '107.000000000000,17.0000000000000,0',
+      '108.000000000000,18.0000000000000,-12.5000000000000',
+    ]);
+    final reparsed = const KmlParserService().parseString(
+      document.toXmlString(),
+    );
+    expect(
+      reparsed.features.single.coordinates.map((coordinate) => coordinate.z),
+      [null, 0, -12.5],
+    );
   });
 
   test('exports Polygon and closes its outer ring', () {
@@ -105,6 +162,36 @@ void main() {
 
     expect(coordinates, hasLength(4));
     expect(coordinates.last, coordinates.first);
+  });
+
+  test('polygon synthesized closure preserves first Z presence and value', () {
+    for (final firstZ in <double?>[null, 0, -4.5]) {
+      final document = exportFeature(
+        MapFeature(
+          id: 'polygon-$firstZ',
+          type: MapFeatureType.polygon,
+          coordinates: [
+            MapCoordinate(x: 106, y: 16, z: firstZ),
+            const MapCoordinate(x: 107, y: 16, z: 8),
+            const MapCoordinate(x: 107, y: 17),
+          ],
+        ),
+      );
+      final tuples = document
+          .findAllElements('coordinates')
+          .single
+          .innerText
+          .split(' ');
+
+      expect(tuples, hasLength(4));
+      expect(tuples.last, tuples.first);
+      final reparsed = const KmlParserService().parseString(
+        document.toXmlString(),
+      );
+      final ring = reparsed.features.single.coordinates;
+      expect(ring.first.z, firstZ);
+      expect(ring.last.z, firstZ);
+    }
   });
 
   test('escapes XML in names descriptions and properties', () {

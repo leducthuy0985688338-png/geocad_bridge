@@ -155,7 +155,7 @@ void main() {
       );
       expect(created.coordinates.single.x, target.x);
       expect(created.coordinates.single.y, target.y);
-      expect(created.coordinates.single.z, target.z);
+      expect(created.coordinates.single.z, isNull);
     }
   });
 
@@ -196,7 +196,53 @@ void main() {
       );
       expect(created.coordinates.single.x, closeTo(expected.x, 1e-6));
       expect(created.coordinates.single.y, closeTo(expected.y, 1e-6));
-      expect(created.coordinates.single.z, expected.z);
+      expect(created.coordinates.single.z, isNull);
+    }
+  });
+
+  testWidgets('Polyline and Polygon drawing snap XY without copying target Z', (
+    tester,
+  ) async {
+    const target = MapCoordinate(x: 25, y: 30, z: 40);
+
+    for (final testCase in [
+      (key: 'draw-polyline', type: MapFeatureType.polyline),
+      (key: 'draw-polygon', type: MapFeatureType.polygon),
+    ]) {
+      final created = <MapFeature>[];
+      await pumpCanvas(
+        tester,
+        MapProject(
+          id: testCase.key,
+          name: 'Project',
+          layers: [
+            layer(
+              id: 'target-layer',
+              crs: local,
+              features: [point('target', target)],
+            ),
+          ],
+        ),
+        onCreated: created.add,
+      );
+      await tester.tap(find.byKey(Key(testCase.key)));
+      await tester.tapAt(const Offset(506, 350));
+      await tester.tapAt(const Offset(700, 350));
+      if (testCase.type == MapFeatureType.polygon) {
+        await tester.tapAt(const Offset(600, 200));
+      }
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('draw-finish')));
+      await tester.pump();
+
+      expect(created.single.type, testCase.type);
+      expect(created.single.coordinates.first.x, target.x);
+      expect(created.single.coordinates.first.y, target.y);
+      expect(created.single.coordinates.first.z, isNull);
+      expect(
+        created.single.coordinates.every((coordinate) => coordinate.z == null),
+        isTrue,
+      );
     }
   });
 

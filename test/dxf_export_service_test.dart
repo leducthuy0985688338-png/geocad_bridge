@@ -174,7 +174,7 @@ void main() {
     expect(result.content, contains('7\r\nSTANDARD\r\n'));
   });
 
-  test('exports POINT XY Z and explicit zero Z', () {
+  test('exports POINT Z only when explicitly supplied', () {
     final result = exportFeatures([
       feature('p1', MapFeatureType.point, const [
         MapCoordinate(x: 1, y: 2, z: 3),
@@ -185,7 +185,11 @@ void main() {
     expect(result.entityCount, 2);
     expect(_recordCount(result.content, 'POINT'), 2);
     expect(result.content, contains('30\r\n3\r\n'));
-    expect(result.content, contains('10\r\n4\r\n20\r\n5\r\n30\r\n0\r\n'));
+    final points = _records(_pairs(result.content))
+        .where((record) => record.type == 'POINT')
+        .toList();
+    expect(points[0].value(30), '3');
+    expect(points[1].value(30), isNull);
   });
 
   test('exports LINE with independent endpoint Z', () {
@@ -198,6 +202,93 @@ void main() {
 
     expect(result.content, contains('10\r\n1\r\n20\r\n2\r\n30\r\n3\r\n'));
     expect(result.content, contains('11\r\n4\r\n21\r\n5\r\n31\r\n6\r\n'));
+  });
+
+  test('POINT preserves null zero positive and negative Z distinctly', () {
+    final result = exportFeatures([
+      feature('null', MapFeatureType.point, const [MapCoordinate(x: 1, y: 1)]),
+      feature('zero', MapFeatureType.point, const [
+        MapCoordinate(x: 2, y: 2, z: 0),
+      ]),
+      feature('positive', MapFeatureType.point, const [
+        MapCoordinate(x: 3, y: 3, z: 12.5),
+      ]),
+      feature('negative', MapFeatureType.point, const [
+        MapCoordinate(x: 4, y: 4, z: -12.5),
+      ]),
+    ]);
+
+    final points = _records(_pairs(result.content))
+        .where((record) => record.type == 'POINT')
+        .toList();
+    expect(points.map((record) => record.value(30)), [
+      null,
+      '0',
+      '12.5',
+      '-12.5',
+    ]);
+  });
+
+  test('LINE endpoint Z presence is serialized independently', () {
+    final result = exportFeatures([
+      feature('start-null', MapFeatureType.line, const [
+        MapCoordinate(x: 1, y: 2),
+        MapCoordinate(x: 3, y: 4, z: 5),
+      ]),
+      feature('end-null', MapFeatureType.line, const [
+        MapCoordinate(x: 6, y: 7, z: -8),
+        MapCoordinate(x: 9, y: 10),
+      ]),
+    ]);
+
+    final lines = _records(_pairs(result.content))
+        .where((record) => record.type == 'LINE')
+        .toList();
+    expect(lines[0].value(30), isNull);
+    expect(lines[0].value(31), '5');
+    expect(lines[1].value(30), '-8');
+    expect(lines[1].value(31), isNull);
+  });
+
+  test('TEXT omits null Z and emits explicit finite Z', () {
+    final result = exportFeatures([
+      feature(
+        'null',
+        MapFeatureType.text,
+        const [MapCoordinate(x: 1, y: 2)],
+        properties: const {'text': 'No elevation'},
+      ),
+      feature(
+        'zero',
+        MapFeatureType.text,
+        const [MapCoordinate(x: 3, y: 4, z: 0)],
+        properties: const {'text': 'Zero elevation'},
+      ),
+    ]);
+
+    final texts = _records(_pairs(result.content))
+        .where((record) => record.type == 'TEXT')
+        .toList();
+    expect(texts[0].value(30), isNull);
+    expect(texts[1].value(30), '0');
+  });
+
+  test('DXF export and import do not turn missing Z into zero', () async {
+    final exported = exportFeatures([
+      feature('null', MapFeatureType.point, const [MapCoordinate(x: 1, y: 2)]),
+      feature('zero', MapFeatureType.point, const [
+        MapCoordinate(x: 3, y: 4, z: 0),
+      ]),
+    ]);
+    final directory = await Directory.systemTemp.createTemp('geocad-z-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}${Platform.pathSeparator}z.dxf');
+    await file.writeAsBytes(exported.bytes);
+
+    final parsed = await const DxfParserService().parseFile(file.path);
+
+    expect(parsed.features[0].coordinates.single.z, isNull);
+    expect(parsed.features[1].coordinates.single.z, 0);
   });
 
   test('exports TEXT values defaults Unicode and multiline warning', () {

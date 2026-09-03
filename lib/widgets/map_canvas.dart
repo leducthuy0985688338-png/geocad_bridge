@@ -808,7 +808,13 @@ class _MapCanvasState extends State<MapCanvas> {
             tolerance: _snapTolerancePixels / effectiveScale,
           );
 
-    return (coordinate: snap?.coordinate ?? coordinate, snap: snap);
+    final snappedCoordinate = snap?.coordinate;
+    return (
+      coordinate: snappedCoordinate == null
+          ? coordinate
+          : MapCoordinate(x: snappedCoordinate.x, y: snappedCoordinate.y),
+      snap: snap,
+    );
   }
 
   void _addDrawingCoordinate(Offset localPosition, Size canvasSize) {
