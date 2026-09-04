@@ -226,6 +226,12 @@ abstract class AppLocalizations {
   /// **'Hình học / thuộc tính'**
   String get geometryAndAttributes;
 
+  /// No description provided for @selectFeatureToEdit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hãy chọn một đối tượng có thể chỉnh sửa trên canvas, sau đó dùng các công cụ chỉnh sửa bên phải.'**
+  String get selectFeatureToEdit;
+
   /// No description provided for @exportingKml.
   ///
   /// In vi, this message translates to:

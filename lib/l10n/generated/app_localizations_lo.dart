@@ -73,6 +73,10 @@ class AppLocalizationsLo extends AppLocalizations {
   String get geometryAndAttributes => 'ເລຂາຄະນິດ / ຄຸນລັກສະນະ';
 
   @override
+  String get selectFeatureToEdit =>
+      'ເລືອກວັດຖຸທີ່ແກ້ໄຂໄດ້ເທິງ canvas ແລ້ວໃຊ້ເຄື່ອງມືແກ້ໄຂທາງຂວາ.';
+
+  @override
   String get exportingKml => 'ກຳລັງສົ່ງອອກ KML...';
 
   @override

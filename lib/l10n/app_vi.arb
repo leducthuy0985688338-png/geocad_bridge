@@ -21,6 +21,7 @@
     "utmWgs84":  "UTM ↔ WGS84",
     "editData":  "Chỉnh sửa dữ liệu",
     "geometryAndAttributes":  "Hình học / thuộc tính",
+    "selectFeatureToEdit": "Hãy chọn một đối tượng có thể chỉnh sửa trên canvas, sau đó dùng các công cụ chỉnh sửa bên phải.",
     "exportingKml":  "Đang xuất KML...",
     "exportGoogleEarth":  "Xuất sang Google Earth",
     "exportingDxf":  "Đang xuất DXF...",

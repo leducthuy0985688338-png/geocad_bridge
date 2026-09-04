@@ -21,6 +21,7 @@
     "utmWgs84":  "UTM ↔ WGS84",
     "editData":  "Edit data",
     "geometryAndAttributes":  "Geometry / attributes",
+    "selectFeatureToEdit": "Select an editable object on the canvas, then use the edit tools on the right.",
     "exportingKml":  "Exporting KML...",
     "exportGoogleEarth":  "Export to Google Earth",
     "exportingDxf":  "Exporting DXF...",

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
 import '../models/coordinate_reference_system.dart';
 import '../models/map_feature.dart';
 import '../models/map_feature_change.dart';
@@ -17,14 +18,34 @@ import 'drawing_painter.dart';
 import 'selection_painter.dart';
 import 'snap_painter.dart';
 
+class MapCanvasController {
+  _MapCanvasState? _client;
+
+  void requestEditData() {
+    _client?._handleEditDataRequest();
+  }
+
+  void _attach(_MapCanvasState client) {
+    _client = client;
+  }
+
+  void _detach(_MapCanvasState client) {
+    if (identical(_client, client)) {
+      _client = null;
+    }
+  }
+}
+
 class MapCanvas extends StatefulWidget {
   final MapProject project;
+  final MapCanvasController? controller;
   final ValueChanged<MapFeatureChange>? onFeatureChanged;
   final ValueChanged<MapFeature>? onFeatureCreated;
 
   const MapCanvas({
     super.key,
     required this.project,
+    this.controller,
     this.onFeatureChanged,
     this.onFeatureCreated,
   });
@@ -112,7 +133,14 @@ class _MapCanvasState extends State<MapCanvas> {
   @override
   void initState() {
     super.initState();
+    widget.controller?._attach(this);
     _displayEntries = _buildDisplayEntries();
+  }
+
+  @override
+  void dispose() {
+    widget.controller?._detach(this);
+    super.dispose();
   }
 
   List<_DisplayFeatureEntry> _buildDisplayEntries() {
@@ -178,6 +206,10 @@ class _MapCanvasState extends State<MapCanvas> {
   @override
   void didUpdateWidget(covariant MapCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
     final selected = _selectedEntry;
     _displayEntries = _buildDisplayEntries();
     if (selected != null && !_isEditingVertex && !_isMovingFeature) {
@@ -1289,7 +1321,7 @@ class _MapCanvasState extends State<MapCanvas> {
       text: feature.coordinates.first.y.toStringAsFixed(4),
     );
 
-    final result = await showDialog<_CoordinateEditResult>(
+    final route = DialogRoute<_CoordinateEditResult>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -1396,6 +1428,9 @@ class _MapCanvasState extends State<MapCanvas> {
       },
     );
 
+    final result = await Navigator.of(context).push(route);
+    await route.completed;
+
     xController.dispose();
     yController.dispose();
 
@@ -1411,6 +1446,24 @@ class _MapCanvasState extends State<MapCanvas> {
     );
 
     _commitSourceFeatureUpdate(updated);
+  }
+
+  void _handleEditDataRequest() {
+    if (_drawingController.isDrawing ||
+        _isEditingVertex ||
+        _isMovingFeature ||
+        !_canEditCoordinate) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).selectFeatureToEdit),
+          ),
+        );
+      return;
+    }
+
+    _showCoordinateEditorDialog();
   }
 
   void _clearPointerState() {

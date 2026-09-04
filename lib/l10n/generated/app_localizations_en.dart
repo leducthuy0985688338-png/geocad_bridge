@@ -73,6 +73,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get geometryAndAttributes => 'Geometry / attributes';
 
   @override
+  String get selectFeatureToEdit =>
+      'Select an editable object on the canvas, then use the edit tools on the right.';
+
+  @override
   String get exportingKml => 'Exporting KML...';
 
   @override

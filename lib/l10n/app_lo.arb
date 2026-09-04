@@ -21,6 +21,7 @@
     "utmWgs84":  "UTM ↔ WGS84",
     "editData":  "ແກ້ໄຂຂໍ້ມູນ",
     "geometryAndAttributes":  "ເລຂາຄະນິດ / ຄຸນລັກສະນະ",
+    "selectFeatureToEdit": "ເລືອກວັດຖຸທີ່ແກ້ໄຂໄດ້ເທິງ canvas ແລ້ວໃຊ້ເຄື່ອງມືແກ້ໄຂທາງຂວາ.",
     "exportingKml":  "ກຳລັງສົ່ງອອກ KML...",
     "exportGoogleEarth":  "ສົ່ງອອກໄປ Google Earth",
     "exportingDxf":  "ກຳລັງສົ່ງອອກ DXF...",

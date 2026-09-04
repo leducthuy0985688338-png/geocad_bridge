@@ -73,6 +73,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get geometryAndAttributes => 'Hình học / thuộc tính';
 
   @override
+  String get selectFeatureToEdit =>
+      'Hãy chọn một đối tượng có thể chỉnh sửa trên canvas, sau đó dùng các công cụ chỉnh sửa bên phải.';
+
+  @override
   String get exportingKml => 'Đang xuất KML...';
 
   @override

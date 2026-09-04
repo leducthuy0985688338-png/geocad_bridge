@@ -99,6 +99,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final MapCanvasController _mapCanvasController = MapCanvasController();
   final CadFileService _cadFileService = const CadFileService();
   final CanvasCoordinateService _canvasCoordinateService =
       const CanvasCoordinateService();
@@ -1590,6 +1591,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onOpenCadFiles: _openCadFiles,
                       onOpenGoogleEarthFiles: _openGoogleEarthFiles,
                       onOpenCoordinateConverter: _openCoordinateConverter,
+                      onEditData: _mapCanvasController.requestEditData,
                       onExportKml: _exportKml,
                       onExportDxf: _exportDxf,
                       onUpdateLayerCrs: _updateLayerCrs,
@@ -1608,6 +1610,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _Workspace(
                       project: _project,
                       isImporting: _isImporting,
+                      mapCanvasController: _mapCanvasController,
                       onFeatureChanged: _applyFeatureChange,
                       onFeatureCreated: _applyFeatureCreation,
                     ),
@@ -1638,6 +1641,7 @@ class _LeftPanel extends StatelessWidget {
   final VoidCallback onOpenCadFiles;
   final VoidCallback onOpenGoogleEarthFiles;
   final VoidCallback onOpenCoordinateConverter;
+  final VoidCallback onEditData;
   final VoidCallback onExportKml;
   final VoidCallback onExportDxf;
   final void Function(MapLayer layer, CoordinateReferenceSystem crs)
@@ -1658,6 +1662,7 @@ class _LeftPanel extends StatelessWidget {
     required this.onOpenCadFiles,
     required this.onOpenGoogleEarthFiles,
     required this.onOpenCoordinateConverter,
+    required this.onEditData,
     required this.onExportKml,
     required this.onExportDxf,
     required this.onUpdateLayerCrs,
@@ -1721,7 +1726,7 @@ class _LeftPanel extends StatelessWidget {
                   icon: Icons.edit_location_alt,
                   title: l10n.editData,
                   subtitle: l10n.geometryAndAttributes,
-                  onPressed: () {},
+                  onPressed: onEditData,
                 ),
                 const SizedBox(height: 10),
                 _ToolButton(
@@ -2402,12 +2407,14 @@ class _LayerCard extends StatelessWidget {
 class _Workspace extends StatelessWidget {
   final MapProject project;
   final bool isImporting;
+  final MapCanvasController mapCanvasController;
   final ValueChanged<MapFeatureChange> onFeatureChanged;
   final ValueChanged<MapFeature> onFeatureCreated;
 
   const _Workspace({
     required this.project,
     required this.isImporting,
+    required this.mapCanvasController,
     required this.onFeatureChanged,
     required this.onFeatureCreated,
   });
@@ -2435,6 +2442,7 @@ class _Workspace extends StatelessWidget {
           Positioned.fill(
             child: MapCanvas(
               project: project,
+              controller: mapCanvasController,
               onFeatureChanged: onFeatureChanged,
               onFeatureCreated: onFeatureCreated,
             ),
@@ -2461,6 +2469,7 @@ class _Workspace extends StatelessWidget {
                 ),
                 child: MapCanvas(
                   project: project,
+                  controller: mapCanvasController,
                   onFeatureChanged: onFeatureChanged,
                   onFeatureCreated: onFeatureCreated,
                 ),
